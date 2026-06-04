@@ -1,21 +1,8 @@
-# Dependencies (if any in the future)
 node_modules/
+cafe-aromas/node_modules/
+cafe-aromas/data/
+nul
 package-lock.json
-
-# Temp files
-gh-tmp/
-/tmp/
-
-# OS files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Git
-*.orig
+java/
+minimarket/
+tumisoft-clone/
