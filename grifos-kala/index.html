@@ -56,10 +56,10 @@
 
     /* ===================== DATA ===================== */
     const PRODUCTOS = [
-      { id: 'diesel', nombre: 'Diésel B5', precio: 23.10, unidad: 'gal', color: C.amber, soft: C.amberSoft, tanque: 'D2#1', maquina: 3 },
-      { id: 'diesel4', nombre: 'Diésel D-B5', precio: 23.10, unidad: 'gal', color: '#D4A017', soft: '#D4A01711', tanque: 'D2#3 / D2#4', maquina: 1 },
-      { id: 'regular', nombre: 'Gasolina Regular', precio: 19.90, unidad: 'gal', color: C.teal, soft: C.tealSoft, tanque: 'Regular', maquina: 2 },
-      { id: 'urea', nombre: 'Urea 32', precio: 2.50, unidad: 'litros', color: C.green, soft: C.greenSoft, tanque: 'Urea', maquina: 4 },
+      { id: 'diesel', nombre: 'Diésel B5', precio: 23.10, unidad: 'gal', color: C.amber, soft: C.amberSoft, tanque: 'D2#1', maquina: 3, mangueras: 2 },
+      { id: 'diesel4', nombre: 'Diésel D-B5', precio: 23.10, unidad: 'gal', color: '#D4A017', soft: '#D4A01711', tanque: 'D2#3 / D2#4', maquina: 1, mangueras: 2 },
+      { id: 'regular', nombre: 'Gasolina Regular', precio: 19.90, unidad: 'gal', color: C.teal, soft: C.tealSoft, tanque: 'Regular', maquina: 2, mangueras: 2 },
+      { id: 'urea', nombre: 'Urea 32', precio: 2.50, unidad: 'litros', color: C.green, soft: C.greenSoft, tanque: 'Urea', maquina: 4, mangueras: 1 },
     ];
 
     const ESTACIONES = ['Grifo Kala Arequipa', 'Grifo Kala Juliaca'];
@@ -1632,7 +1632,8 @@
         const init = {};
         PRODUCTOS.forEach(p => {
           init[p.id] = [];
-          for (let i = 1; i <= 2; i++) {
+          const numMangueras = p.mangueras || 2;
+          for (let i = 0; i < numMangueras; i++) {
             init[p.id].push({ id: Date.now() + Math.random(), anterior: '', actual: '' });
           }
         });
@@ -1782,15 +1783,19 @@
                         <input type="number" step="0.001" min="0" placeholder="0.000" value={r.anterior} onChange={e => setLectura(p.id, idx, 'anterior', e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 8px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
                         <input type="number" step="0.001" min="0" placeholder="0.000" value={r.actual} onChange={e => setLectura(p.id, idx, 'actual', e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 8px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
                         <div style={{ textAlign: 'right' }}><span style={{ fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, color: gal > 0 ? p.color : C.muted }}>{gal > 0 ? gal.toFixed(2) : '0.00'}</span>{gal > 0 && <span style={{ fontFamily: 'Inter', fontSize: 9, color: C.muted, marginLeft: 2 }}>—</span>}</div>
-                        <button onClick={() => eliminarManguera(p.id, idx)} type="button" style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 2, opacity: 0.5 }} title="Eliminar manguera">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                        </button>
+                        {(lecturas[p.id] || []).length > 1 && (
+                          <button onClick={() => eliminarManguera(p.id, idx)} type="button" style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 2, opacity: 0.5 }} title="Eliminar manguera">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                          </button>
+                        )}
                       </div>
                     );
                   })}
-                  <button onClick={() => agregarManguera(p.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: `1px dashed ${C.border}`, background: 'transparent', color: C.textDim, fontFamily: 'Inter', fontSize: 11, cursor: 'pointer', marginTop: 4 }}>
-                    + Agregar manguera
-                  </button>
+                  {(lecturas[p.id] || []).length < (p.mangueras || 10) && (
+                    <button onClick={() => agregarManguera(p.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: `1px dashed ${C.border}`, background: 'transparent', color: C.textDim, fontFamily: 'Inter', fontSize: 11, cursor: 'pointer', marginTop: 4 }}>
+                      + Agregar manguera
+                    </button>
+                  )}
                   <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 12, paddingTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Total {p.nombre.toLowerCase()}: <b style={{ color: C.text }}>{galones.toFixed(2)} gal</b></span>
                     <span style={{ fontFamily: 'JetBrains Mono', fontSize: 16, fontWeight: 700, color: p.color }}>{money(monto)}</span>
