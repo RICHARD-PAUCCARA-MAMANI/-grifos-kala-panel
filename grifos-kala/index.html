@@ -211,11 +211,11 @@
     ];
 
     const MAQUINAS_INIT = [
-      { id: 'm1', nombre: 'Máquina 1', isla: 'Tanques D2#3 y D2#4', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa' },
-      { id: 'm2', nombre: 'Máquina 2', isla: 'Tanque Regular', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa' },
-      { id: 'm3', nombre: 'Máquina 3', isla: 'Tanque D2#1', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa' },
-      { id: 'm4', nombre: 'Máquina 4', isla: 'Tanque Urea', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa' },
-      { id: 'm5', nombre: 'Máquina 1', isla: 'Tanque Regular', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Juliaca' },
+      { id: 'm1', nombre: 'Máquina 1', isla: 'Tanques D2#3 y D2#4', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa', productoId: 'diesel4' },
+      { id: 'm2', nombre: 'Máquina 2', isla: 'Tanque Regular', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa', productoId: 'regular' },
+      { id: 'm3', nombre: 'Máquina 3', isla: 'Tanque D2#1', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa', productoId: 'diesel' },
+      { id: 'm4', nombre: 'Máquina 4', isla: 'Tanque Urea', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa', productoId: 'urea' },
+      { id: 'm5', nombre: 'Máquina 1', isla: 'Tanque Regular', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Juliaca', productoId: 'regular' },
     ];
 
     /* ===================== TABLAS DE CALIBRACIÓN ===================== */
@@ -1614,12 +1614,13 @@
       const [maquinasSeleccionadas, setMaquinasSeleccionadas] = useState([]);
 
       const maquinasDisponibles = useMemo(() => {
-        if (maquinasProp && maquinasProp.length > 0) return maquinasProp;
-        if (trabajador && trabajador.maquinasAsignadas && trabajador.maquinasAsignadas.length > 0) {
-          return trabajador.maquinasAsignadas;
+        let all = [];
+        if (maquinasProp && maquinasProp.length > 0) all = maquinasProp;
+        else if (trabajador && trabajador.maquinasAsignadas && trabajador.maquinasAsignadas.length > 0) {
+          all = trabajador.maquinasAsignadas;
         }
-        return [];
-      }, [maquinasProp, trabajador]);
+        return all.filter(m => m.estacion === estacion);
+      }, [maquinasProp, trabajador, estacion]);
 
       function toggleMaquinaSeleccionada(mId) {
         setMaquinasSeleccionadas(prev => 
@@ -1672,8 +1673,19 @@
         return calcularGalones(productoId) * (p ? p.precio : 0);
       }
 
-      const totalMangueras = PRODUCTOS.reduce((sum, p) => sum + calcularMontoProducto(p.id), 0);
-      const totalGalonesMangueras = PRODUCTOS.reduce((sum, p) => sum + calcularGalones(p.id), 0);
+      const productosVisibles = useMemo(() => {
+        if (maquinasSeleccionadas.length === 0) return PRODUCTOS;
+        const pIds = new Set();
+        maquinasSeleccionadas.forEach(mId => {
+          const m = maquinasDisponibles.find(mm => mm.id === mId);
+          if (m && m.productoId) pIds.add(m.productoId);
+        });
+        if (pIds.size === 0) return PRODUCTOS;
+        return PRODUCTOS.filter(p => pIds.has(p.id));
+      }, [maquinasSeleccionadas, maquinasDisponibles]);
+
+      const totalMangueras = productosVisibles.reduce((sum, p) => sum + calcularMontoProducto(p.id), 0);
+      const totalGalonesMangueras = productosVisibles.reduce((sum, p) => sum + calcularGalones(p.id), 0);
       const totalVentas = ventasWorker.length;
       const montoTotal = ventasWorker.reduce((a, v) => a + v.total, 0);
       const efectivo = ventasWorker.filter(v => v.metodo === 'Efectivo').reduce((a, v) => a + v.total, 0);
@@ -1741,7 +1753,7 @@
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(380px, 1fr))', gap: 16, marginTop: 16 }}>
-            {PRODUCTOS.map(p => {
+            {productosVisibles.map(p => {
               const galones = calcularGalones(p.id);
               const monto = calcularMontoProducto(p.id);
               return (
@@ -1912,7 +1924,7 @@
             {tab === 'venta' ? (
               <WorkerNuevaVenta usuario={nombreMostrar} estacion={estacion} ventasWorker={ventasWorker} setVentasWorker={setVentasWorker} />
             ) : (
-              <WorkerCierreTurno ventasWorker={ventasWorker} estacion={estacion} usuario={nombreMostrar} trabajador={trabajador} maquinas={maquinasTrabajador} />
+              <WorkerCierreTurno ventasWorker={ventasWorker} estacion={estacion} usuario={nombreMostrar} trabajador={trabajador} maquinas={maquinasGlobal} />
             )}
           </div>
 
