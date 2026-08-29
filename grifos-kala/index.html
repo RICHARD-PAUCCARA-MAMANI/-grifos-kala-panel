@@ -1,0 +1,1969 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grifos Kala — Panel de Operaciones</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23E8A33D'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='%2312161A'>⛽</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
+  <script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { width: 100%; min-height: 100vh; }
+    body { font-family: 'Inter', sans-serif; background: #12161A; }
+    input:focus, select:focus { outline: none; }
+    button { font: inherit; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #343E46; border-radius: 3px; }
+    .hide-mobile { display: initial; }
+    .tabs-scroll { display: flex; gap: 8px; }
+    @media (max-width: 640px) {
+      .hide-mobile { display: none !important; }
+      .tabs-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-wrap: nowrap; padding-bottom: 4px; }
+      .tabs-scroll::-webkit-scrollbar { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+  <script type="text/babel">
+    const { useState, useMemo, useEffect } = React;
+    const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } = Recharts;
+
+    /* ===================== PALETTE ===================== */
+    const DARK = {
+      bg: '#12161A', panel: '#212930', panelLight: '#2A333B', border: '#343E46',
+      amber: '#E8A33D', amberSoft: '#3A2E1A', teal: '#4FB0A6', tealSoft: '#173330',
+      green: '#8CAE5E', greenSoft: '#26301A', red: '#DD6259', redSoft: '#3A1F1D',
+      text: '#F3EFE6', textDim: '#B7BEC4', muted: '#7C868D',
+      blue: '#5B9BD5', purple: '#7B2D8E',
+    };
+    const LIGHT = {
+      bg: '#F5F5F0', panel: '#FFFFFF', panelLight: '#FAFAF7', border: '#E0DDD5',
+      amber: '#C4841D', amberSoft: '#FDF3E1', teal: '#2D8A7E', tealSoft: '#E6F5F3',
+      green: '#5A8A2F', greenSoft: '#EDF5E4', red: '#C0392B', redSoft: '#FDECEB',
+      text: '#1A1A1A', textDim: '#555555', muted: '#999999',
+      blue: '#2E75B6', purple: '#9B30FF',
+    };
+    let C = DARK;
+
+    /* ===================== DATA ===================== */
+    const PRODUCTOS = [
+      { id: 'diesel', nombre: 'Diésel B5', precio: 23.10, unidad: 'gal', color: C.amber, soft: C.amberSoft, tanque: 'D2#1', maquina: 3 },
+      { id: 'diesel4', nombre: 'Diésel D-B5', precio: 23.10, unidad: 'gal', color: '#D4A017', soft: '#D4A01711', tanque: 'D2#3 / D2#4', maquina: 1 },
+      { id: 'regular', nombre: 'Gasolina Regular', precio: 19.90, unidad: 'gal', color: C.teal, soft: C.tealSoft, tanque: 'Regular', maquina: 2 },
+      { id: 'urea', nombre: 'Urea 32', precio: 2.50, unidad: 'litros', color: C.green, soft: C.greenSoft, tanque: 'Urea', maquina: 4 },
+    ];
+
+    const ESTACIONES = ['Grifo Kala Arequipa', 'Grifo Kala Juliaca'];
+    const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    const METODOS = [
+      { id: 'efectivo', label: 'Efectivo' }, { id: 'tarjeta', label: 'Tarjeta' },
+      { id: 'yape', label: 'Yape' }, { id: 'transferencia', label: 'Transferencia' },
+      { id: 'deposito', label: 'Depósito' },
+    ];
+
+    const EMPRESA = { ruc: '20612345679', razonSocial: 'GRIFOS KALA S.A.C.', nombreComercial: 'GRIFOS KALA', direccion: 'AV. INDUSTRIAL 1234', distrito: 'Cercado de Arequipa', provincia: 'Arequipa', ciudad: 'Arequipa', ubigeo: '040101', telefono: '054-123456', email: 'ventas@grifoskala.com' };
+
+    /* ===================== APIsPERU - FACTURACIÓN ELECTRÓNICA ===================== */
+    const APIS_PERU = {
+      baseUrl: 'https://facturacion.apisperu.com/api/v1',
+      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MTk1MyJ9.2CV52mUCNSAIgyVk7m2O8GBUjeFrDPk9Mvkavm9hD7w',
+    };
+
+    async function emitirComprobanteElectronico(venta) {
+      const esFactura = venta.comp === 'Factura';
+      const cliente = venta.cliente || {};
+      const tipoDoc = esFactura ? '6' : '1';
+      const numDoc = esFactura ? (cliente.ruc || '') : (cliente.dni || '');
+      const razonSocial = cliente.nombre || 'CLIENTE VARIOS';
+
+      const now = new Date();
+      const fecha = now.toISOString().split('T')[0];
+      const hora = now.toTimeString().slice(0, 8);
+
+      const subtotal = venta.total / 1.18;
+      const igv = venta.total - subtotal;
+
+      const productos = (venta.items || []).map((item, idx) => ({
+        unidades: 1,
+        codigoUnidad: item.unidad === 'gal' ? 'GLL' : item.unidad === 'litros' ? 'LTR' : 'NIU',
+        nombre: item.nombre,
+        moneda: 'PEN',
+        precioUnitario: item.precioUnitario || 0,
+        precioLista: (item.precioUnitario || 0).toFixed(2),
+        montoSinImpuesto: parseFloat(((item.precioUnitario || 0) / 1.18).toFixed(2)),
+        montoImpuestos: parseFloat((((item.precioUnitario || 0) / 1.18) * 0.18).toFixed(2)),
+        montoTotal: item.total,
+        montoIcbper: 0,
+        factorIcbper: 0,
+        montoDescuento: 0,
+        codigoTipoPrecio: '01',
+        impuestos: [{
+          monto: parseFloat((((item.precioUnitario || 0) / 1.18) * 0.18).toFixed(2)),
+          idCategoria: 'S',
+          porcentaje: 18,
+          codigoAfectacionIgv: '10',
+          codigoInterTributo: 'VAT',
+          nombreTributo: 'IGV',
+          codigoTributo: '1000'
+        }],
+        id: 'ITEM' + String(idx + 1).padStart(3, '0'),
+        codigoClasificacion: '531117'
+      }));
+
+      const body = {
+        tipoOperacion: '010',
+        serie: esFactura ? 'F001' : 'B001',
+        correlativo: venta.serie ? venta.serie.split('-')[1] : String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0'),
+        fechaEmision: fecha,
+        horaEmision: hora,
+        fechaVencimiento: fecha,
+        codigoTipoOperacion: '0101',
+        codigoTipoDocumento: esFactura ? '01' : '03',
+        moneda: 'PEN',
+        montoCredito: 0,
+        formaPago: 'Contado',
+        igv: 18.00,
+        icbper: 0,
+        cuotas: [],
+        emisor: {
+          codigoTipoDocumento: '6',
+          numDocumento: EMPRESA.ruc,
+          razonSocial: EMPRESA.razonSocial,
+          nombreComercial: EMPRESA.nombreComercial,
+          ubigeo: EMPRESA.ubigeo,
+          ciudad: EMPRESA.ciudad,
+          distrito: EMPRESA.distrito,
+          provincia: EMPRESA.provincia,
+          direccion: EMPRESA.direccion
+        },
+        cliente: {
+          codigoTipoDocumento: tipoDoc,
+          numDocumento: numDoc,
+          razonSocial: razonSocial,
+          nombreComercial: razonSocial,
+          ubigeo: '',
+          ciudad: '',
+          distrito: '',
+          provincia: '',
+          direccion: cliente.direccion || ''
+        },
+        totales: {
+          totalOpGravadas: parseFloat(subtotal.toFixed(2)),
+          totalOpInafectas: 0,
+          totalOpExoneradas: 0,
+          totalImpuestos: parseFloat(igv.toFixed(2)),
+          totalSinImpuestos: parseFloat(subtotal.toFixed(2)),
+          totalConImpuestos: parseFloat(venta.total.toFixed(2)),
+          totalPagar: parseFloat(venta.total.toFixed(2)),
+          totalDescuentoGlobal: 0,
+          totalDescuentoProductos: 0
+        },
+        productos: productos
+      };
+
+      try {
+        const response = await fetch(`${APIS_PERU.baseUrl}/document/emit`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${APIS_PERU.token}`,
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        const result = await response.json();
+        if (response.ok) {
+          console.log('✅ Comprobante electrónico emitido:', result);
+          return { ok: true, data: result };
+        } else {
+          console.error('❌ Error al emitir:', result);
+          return { ok: false, error: result };
+        }
+      } catch (err) {
+        console.error('❌ Error de conexión:', err.message);
+        return { ok: false, error: err.message };
+      }
+    }
+
+    const VENTAS_SEMANA = [
+      { dia: 'Lun', Arequipa: 4820, Juliaca: 3910 }, { dia: 'Mar', Arequipa: 5210, Juliaca: 4110 },
+      { dia: 'Mié', Arequipa: 4990, Juliaca: 3800 }, { dia: 'Jue', Arequipa: 5430, Juliaca: 4260 },
+      { dia: 'Vie', Arequipa: 6120, Juliaca: 4990 }, { dia: 'Sáb', Arequipa: 6890, Juliaca: 5510 },
+      { dia: 'Dom', Arequipa: 5340, Juliaca: 4300 },
+    ];
+
+    function horario(map) { return DIAS.map(d => ({ dia: d, ...map[d] })); }
+
+    const TRABAJADORES_INIT = [
+      { id: 1, nombre: 'Milagros Condori', dni: '48562190', usuario: 'mcondori', estacion: 'Grifo Kala Arequipa',
+        horario: horario({ Lun: { libre: false, ini: '06:00', fin: '14:00' }, Mar: { libre: false, ini: '06:00', fin: '14:00' }, Mié: { libre: false, ini: '06:00', fin: '14:00' }, Jue: { libre: false, ini: '06:00', fin: '14:00' }, Vie: { libre: false, ini: '06:00', fin: '14:00' }, Sáb: { libre: true }, Dom: { libre: true } }) },
+      { id: 2, nombre: 'Edwin Mamani', dni: '76901234', usuario: 'emamani', estacion: 'Grifo Kala Arequipa',
+        horario: horario({ Lun: { libre: false, ini: '14:00', fin: '22:00' }, Mar: { libre: false, ini: '14:00', fin: '22:00' }, Mié: { libre: false, ini: '14:00', fin: '22:00' }, Jue: { libre: false, ini: '14:00', fin: '22:00' }, Vie: { libre: false, ini: '14:00', fin: '22:00' }, Sáb: { libre: true }, Dom: { libre: true } }) },
+    ];
+
+    const MAQUINAS_INIT = [
+      { id: 'm1', nombre: 'Máquina 1', isla: 'Tanques D2#3 y D2#4', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa' },
+      { id: 'm2', nombre: 'Máquina 2', isla: 'Tanque Regular', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa' },
+      { id: 'm3', nombre: 'Máquina 3', isla: 'Tanque D2#1', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa' },
+      { id: 'm4', nombre: 'Máquina 4', isla: 'Tanque Urea', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Arequipa' },
+      { id: 'm5', nombre: 'Máquina 1', isla: 'Tanque Regular', mangueros: 4, estado: 'Activa', estacion: 'Grifo Kala Juliaca' },
+    ];
+
+    /* ===================== TABLAS DE CALIBRACIÓN ===================== */
+    function generarTablaCalibracion(longitud, diametro, capacidadMax, maxCm) {
+      const tabla = [];
+      const R = diametro / 2;
+      for (let cm = 0; cm <= maxCm; cm++) {
+        if (cm === 0) { tabla.push(0); continue; }
+        if (cm >= maxCm) { tabla.push(capacidadMax); continue; }
+        const h = cm / 100;
+        if (h >= diametro) { tabla.push(capacidadMax); continue; }
+        const acosArg = Math.max(-1, Math.min(1, (R - h) / R));
+        const sqrtArg = Math.max(0, 2 * R * h - h * h);
+        const area = R * R * Math.acos(acosArg) - (R - h) * Math.sqrt(sqrtArg);
+        tabla.push(Math.round(longitud * area * 264.172 * 100) / 100);
+      }
+      return tabla;
+    }
+    function interpolarTabla(cm, tabla) {
+      if (cm <= 0) return 0;
+      if (cm >= tabla.length - 1) return tabla[tabla.length - 1];
+      const idx = Math.floor(cm);
+      const frac = cm - idx;
+      if (frac === 0 || idx >= tabla.length - 1) return tabla[Math.min(idx, tabla.length - 1)];
+      return tabla[idx] + frac * (tabla[idx + 1] - tabla[idx]);
+    }
+    function buscarCmEnTabla(galones, tabla) {
+      if (galones <= 0) return 0;
+      if (galones >= tabla[tabla.length - 1]) return tabla.length - 1;
+      let lo = 0, hi = tabla.length - 1;
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (tabla[mid] <= galones) lo = mid; else hi = mid; }
+      if (tabla[hi] === tabla[lo]) return lo;
+      return lo + (galones - tabla[lo]) / (tabla[hi] - tabla[lo]);
+    }
+    const TABLAS_PRE = {
+      diesel1: generarTablaCalibracion(3.63, 2.29, 3927.39, 228),
+      regular: generarTablaCalibracion(1.81, 2.28, 1947.02, 228),
+      diesel3: generarTablaCalibracion(1.81, 2.28, 1947.02, 228),
+      diesel4: generarTablaCalibracion(4.86, 2.29, 5287, 229),
+    };
+
+    /* ===================== HELPERS ===================== */
+    function money(n) { return 'S/ ' + n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function formatFechaCorta(d) { return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }); }
+    function formatFechaLarga(d) { const s = d.toLocaleDateString('es-PE', { weekday: 'long', day: '2-digit', month: 'long' }); return s.charAt(0).toUpperCase() + s.slice(1); }
+    function addDias(d, n) { const nd = new Date(d); nd.setDate(nd.getDate() + n); return nd; }
+    function numeroALetras(n) { return 'SON ' + money(n).replace('S/ ', '') + ' SOLES'; }
+    function generarNumeroComprobante(tipo) { const p = tipo === 'factura' ? 'F001' : 'B001'; return p + '-' + String(Math.floor(Math.random()*99999)+1).padStart(5,'0'); }
+
+    function getInputStyle() { return { width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'Inter', fontSize: 13.5, boxSizing: 'border-box' }; }
+
+    /* ===================== RESPONSIVE HOOK ===================== */
+    function useIsMobile(bp) {
+      const [m, setM] = useState(() => typeof window !== 'undefined' && window.innerWidth <= (bp || 640));
+      useEffect(() => { const q = window.matchMedia(`(max-width: ${bp || 640}px)`); const fn = e => setM(e.matches); q.addEventListener('change', fn); setM(q.matches); return () => q.removeEventListener('change', fn); }, [bp]);
+      return m;
+    }
+
+    /* ===================== ICON COMPONENTS ===================== */
+    const I = {
+      Fuel: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><path d="M15 10h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2v0a2 2 0 0 0 2-2V9l-3-3"/><path d="M3 22h12"/><path d="M7 7v5"/></svg>,
+      Droplet: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>,
+      Gauge: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>,
+      CreditCard: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>,
+      Banknote: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>,
+      Smartphone: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>,
+      ArrowLeftRight: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>,
+      FileText: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>,
+      Receipt: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>,
+      TrendingUp: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+      Users: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+      User: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+      Settings: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+      ChevronDown: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="m6 9 6 6 6-6"/></svg>,
+      Check: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M20 6 9 17l-5-5"/></svg>,
+      BarChart3: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>,
+      Building2: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>,
+      Clock: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+      ShieldCheck: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>,
+      LayoutDashboard: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+      ListChecks: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>,
+      Lock: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+      Eye: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
+      EyeOff: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>,
+      LogOut: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
+      Plus: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+      Trash2: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+      X: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+      AlertTriangle: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>,
+      Wallet: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2.276"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>,
+      FilePlus: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg>,
+      Minus: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M5 12h14"/></svg>,
+      Percent: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>,
+      FileOutput: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>,
+    };
+
+    /* ===================== SHARED COMPONENTS ===================== */
+    function Logo() {
+      return (<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: C.amber, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><I.Fuel size={22} color={C.bg} strokeWidth={2.4} /></div>
+        <div style={{ lineHeight: 1.05 }}>
+          <div style={{ fontFamily: "'Oswald', sans-serif", fontWeight: 600, fontSize: 19, letterSpacing: '0.03em', color: C.text, textTransform: 'uppercase' }}>Grifos Kala</div>
+          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.muted, letterSpacing: '0.04em' }}>Panel de operaciones</div>
+        </div>
+      </div>);
+    }
+
+    function Field({ label, children }) {
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}><label style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim }}>{label}</label>{children}</div>);
+    }
+
+    function Pill({ active, onClick, children, Icon }) {
+      return (<button onClick={onClick} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 999, border: `1px solid ${active ? C.amber : C.border}`, background: active ? C.amberSoft : 'transparent', color: active ? C.amber : C.textDim, fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{Icon && <Icon size={14} />}{children}</button>);
+    }
+
+    function KpiCard({ label, value, sub, color }) {
+      return (<div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px' }}>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: C.muted, marginBottom: 8 }}>{label}</div>
+        <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 25, fontWeight: 600, color: color || C.text }}>{value}</div>
+        {sub && <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, color: C.muted, marginTop: 4 }}>{sub}</div>}
+      </div>);
+    }
+
+    function TabBar({ tabs, active, onChange }) {
+      return (<div className="tabs-scroll">{tabs.map(t => (
+        <button key={t.id} onClick={() => onChange(t.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 9, border: `1px solid ${active === t.id ? C.amber : C.border}`, background: active === t.id ? C.amberSoft : C.panel, color: active === t.id ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          <t.Icon size={14} /> {t.label}
+        </button>
+      ))}</div>);
+    }
+
+    /* ===================== LOGIN ===================== */
+    function LoginScreen({ onLogin }) {
+      const [rol, setRol] = useState('trabajador');
+      const [usuario, setUsuario] = useState('');
+      const [clave, setClave] = useState('');
+      const [verClave, setVerClave] = useState(false);
+      const [error, setError] = useState('');
+      function submit() { if (!usuario.trim() || !clave.trim()) { setError('Ingresa tu usuario y contraseña.'); return; } setError(''); onLogin(rol, usuario.trim()); }
+      function onKeyDownField(e) { if (e.key === 'Enter') submit(); }
+      return (<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, padding: 20 }}>
+        <div style={{ width: '100%', maxWidth: 380 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 26 }}><Logo /></div>
+          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 24 }}>
+            <div style={{ display: 'flex', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 3, marginBottom: 20 }}>
+              {['trabajador', 'admin'].map(r => (<button key={r} type="button" onClick={() => setRol(r)} style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: 'none', background: rol === r ? C.amber : 'transparent', color: rol === r ? C.bg : C.textDim, fontFamily: 'Inter', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>{r === 'trabajador' ? 'Trabajador' : 'Administrador'}</button>))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <Field label="Usuario"><input style={getInputStyle()} placeholder="ej. mcondori" value={usuario} onChange={e => setUsuario(e.target.value)} onKeyDown={onKeyDownField} /></Field>
+              <Field label="Contraseña"><div style={{ position: 'relative' }}>
+                <input style={{ ...getInputStyle(), paddingRight: 38 }} type={verClave ? 'text' : 'password'} placeholder="••••••••" value={clave} onChange={e => setClave(e.target.value)} onKeyDown={onKeyDownField} />
+                <button type="button" onClick={() => setVerClave(v => !v)} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 4 }}>{verClave ? <I.EyeOff size={16} /> : <I.Eye size={16} />}</button>
+              </div></Field>
+              {error && <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.red, fontFamily: 'Inter', fontSize: 12.5 }}><I.AlertTriangle size={14} /> {error}</div>}
+              <button type="button" onClick={submit} style={{ marginTop: 4, background: C.amber, color: C.bg, border: 'none', borderRadius: 9, padding: '11px 0', fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Ingresar</button>
+            </div>
+          </div>
+        </div>
+      </div>);
+    }
+
+    /* ===================== ADMIN: RESUMEN ===================== */
+    function ResumenAdmin({ estacion }) {
+      const isMobile = useIsMobile();
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <div><div style={{ fontFamily: "'Inter'", fontSize: 12, color: C.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Precios vigentes · {estacion}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 12 }}>{PRODUCTOS.map(p => <LedPrice key={p.id} producto={p} />)}</div></div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
+          <KpiCard label="Ventas de hoy" value={money(8214.30)} sub="Ambos grifos" color={C.amber} />
+          <KpiCard label="Galones despachados" value="1,246" sub="Todos los productos" />
+          <KpiCard label="Facturas emitidas" value="34" sub="Con RUC" color={C.teal} />
+          <KpiCard label="Boletas emitidas" value="118" sub="Sin RUC" />
+        </div>
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}><I.BarChart3 size={15} color={C.amber} /><span style={{ fontFamily: "'Inter'", fontSize: 13, fontWeight: 500, color: C.text }}>Ventas por estación · últimos 7 días (S/)</span></div>
+          <ResponsiveContainer width="100%" height={220}><BarChart data={VENTAS_SEMANA} barGap={4}><CartesianGrid stroke={C.border} strokeDasharray="3 3" vertical={false} /><XAxis dataKey="dia" tick={{ fill: C.muted, fontSize: 12, fontFamily: 'Inter' }} axisLine={{ stroke: C.border }} tickLine={false} /><YAxis tick={{ fill: C.muted, fontSize: 11, fontFamily: 'Inter' }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ background: C.panelLight, border: `1px solid ${C.border}`, borderRadius: 8, fontFamily: 'Inter', fontSize: 12 }} labelStyle={{ color: C.text }} /><Bar dataKey="Arequipa" fill={C.amber} radius={[4, 4, 0, 0]} /><Bar dataKey="Juliaca" fill={C.teal} radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
+        </div>
+      </div>);
+    }
+
+    function LedPrice({ producto }) {
+      const { nombre, precio, unidad, color, soft, id, tanque, maquina } = producto;
+      const IconComp = { diesel: I.Fuel, diesel4: I.Fuel, urea: I.Droplet, regular: I.Gauge }[id] || I.Fuel;
+      return (<div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: C.textDim }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: soft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconComp size={15} color={color} /></div>
+            <span style={{ fontFamily: "'Inter'", fontSize: 12.5, fontWeight: 500 }}>{nombre}</span>
+          </div>
+          {tanque && <span style={{ fontFamily: 'Inter', fontSize: 9, color: C.muted, background: C.bg, padding: '2px 6px', borderRadius: 4, border: `1px solid ${C.border}` }}>{tanque} · M{maquina}</span>}
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono'", fontWeight: 700, fontSize: 26, color, letterSpacing: '0.02em' }}>S/ {precio.toFixed(2)}<span style={{ fontFamily: "'Inter'", fontWeight: 500, fontSize: 11, color: C.muted, marginLeft: 6 }}>/ {unidad}</span></div>
+      </div>);
+    }
+
+    /* ===================== ADMIN: CONTROL DE TANQUES ===================== */
+    function ControlTanquesAdmin({ estacion }) {
+      const isMobile = useIsMobile();
+      const [showReposicion, setShowReposicion] = useState(false);
+      const [tanques, setTanques] = useState({
+        regular: { nombre: 'Regular', capacidad: 1947.02, nivelCm: 80, alturaTotalCm: 228, unidad: 'gal', color: C.teal, soft: C.tealSoft, icono: I.Gauge, provisorio: 'Repsol', consumoDiario: 350, ultimoAbastecimiento: '22/08/2026', costoUnitario: 15.20, longitud: 1.81, diametro: 2.28 },
+        diesel1: { nombre: 'D2#1', capacidad: 3927.39, nivelCm: 160, alturaTotalCm: 228, unidad: 'gal', color: C.amber, soft: C.amberSoft, icono: I.Fuel, provisorio: 'PetroPerú', consumoDiario: 650, ultimoAbastecimiento: '22/08/2026', costoUnitario: 18.50, longitud: 3.63, diametro: 2.29 },
+        diesel3: { nombre: 'D2#3', capacidad: 1947.02, nivelCm: 120, alturaTotalCm: 228, unidad: 'gal', color: C.amber, soft: C.amberSoft, icono: I.Fuel, provisorio: 'PetroPerú', consumoDiario: 350, ultimoAbastecimiento: '20/08/2026', costoUnitario: 18.50, longitud: 1.81, diametro: 2.28 },
+        diesel4: { nombre: 'D2#4', capacidad: 5287, nivelCm: 160, alturaTotalCm: 229, unidad: 'gal', color: C.amber, soft: C.amberSoft, icono: I.Fuel, provisorio: 'PetroPerú', consumoDiario: 900, ultimoAbastecimiento: '22/08/2026', costoUnitario: 18.50, longitud: 4.86, diametro: 2.29 },
+        urea: { nombre: 'Urea', capacidad: 2000, nivelCm: 700, alturaTotalCm: 1400, unidad: 'litros', color: C.green, soft: C.greenSoft, icono: I.Droplet, provisorio: 'InkaFertil', consumoDiario: 50, ultimoAbastecimiento: '18/08/2026', costoUnitario: 1.80, longitud: 0, diametro: 0 },
+      });
+      function cmAGalones(cm, tanqueId) {
+        const tanque = tanques[tanqueId]; if (!tanque) return 0;
+        if (cm <= 0) return 0;
+        if (tanque.unidad === 'litros') return Math.round((cm / tanque.alturaTotalCm) * tanque.capacidad);
+        if (cm >= tanque.alturaTotalCm) return Math.round(tanque.capacidad);
+        const tabla = TABLAS_PRE[tanqueId]; if (!tabla) return 0;
+        return Math.round(interpolarTabla(cm, tabla) * 10) / 10;
+      }
+      function galonesACm(galones, tanqueId) {
+        const tanque = tanques[tanqueId]; if (!tanque) return 0;
+        if (galones <= 0) return 0; if (galones >= tanque.capacidad) return tanque.alturaTotalCm;
+        if (tanque.unidad === 'litros') return Math.round((galones / tanque.capacidad) * tanque.alturaTotalCm);
+        const tabla = TABLAS_PRE[tanqueId]; if (!tabla) return 0;
+        return Math.round(buscarCmEnTabla(galones, tabla) * 10) / 10;
+      }
+      function ajustarNivelCm(id, nuevoCm) { setTanques(prev => ({ ...prev, [id]: { ...prev[id], nivelCm: Math.max(0, Math.min(Number(nuevoCm) || 0, prev[id].alturaTotalCm)) } })); }
+
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {Object.entries(tanques).some(([, t]) => (t.nivelCm / t.alturaTotalCm) <= 0.2) && (
+          <div style={{ background: C.redSoft, border: `1px solid ${C.red}44`, borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <I.AlertTriangle size={18} color={C.red} style={{ flexShrink: 0 }} />
+            <div><div style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 600, color: C.red }}>⚠️ Alerta de reposición urgente</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim, marginTop: 2 }}>{Object.entries(tanques).filter(([, t]) => (t.nivelCm / t.alturaTotalCm) <= 0.2).map(([id, t]) => (<span key={id}><b style={{ color: t.color }}>{t.nombre}</b> al {((t.nivelCm / t.alturaTotalCm) * 100).toFixed(1)}% —{' '}</span>))}Contacta a tu proveedor.</div>
+            </div>
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+          {Object.entries(tanques).map(([id, t]) => {
+            const nivelGalones = cmAGalones(t.nivelCm, id);
+            const porcentaje = (t.nivelCm / t.alturaTotalCm) * 100;
+            const diasRestantes = t.consumoDiario > 0 ? Math.floor(nivelGalones / t.consumoDiario) : 999;
+            const estado = porcentaje <= 10 ? 'critico' : porcentaje <= 20 ? 'bajo' : porcentaje <= 50 ? 'medio' : 'bien';
+            const estadoColor = { critico: C.red, bajo: C.amber, medio: C.teal, bien: C.green }[estado];
+            const estadoLabel = { critico: 'CRÍTICO', bajo: 'BAJO', medio: 'MEDIO', bien: 'ÓPTIMO' }[estado];
+            return (<div key={id} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: t.soft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><t.icono size={17} color={t.color} /></div>
+                  <div><div style={{ fontFamily: 'Inter', fontSize: 13.5, fontWeight: 600, color: C.text }}>{t.nombre}</div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>Capacidad: {t.capacidad.toLocaleString()} {t.unidad}</div></div>
+                </div>
+                <div style={{ padding: '4px 10px', borderRadius: 6, background: `${estadoColor}22`, border: `1px solid ${estadoColor}44` }}><span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, fontWeight: 700, color: estadoColor }}>{estadoLabel}</span></div>
+              </div>
+              <div style={{ background: C.bg, borderRadius: 10, height: 120, position: 'relative', border: `1px solid ${C.border}`, overflow: 'hidden', marginBottom: 12 }}>
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${porcentaje}%`, background: `linear-gradient(180deg, ${t.color}CC 0%, ${t.color}66 100%)`, borderRadius: '0 0 9px 9px', transition: 'height 0.5s ease' }} />
+                {[20, 50, 80].map(l => (<div key={l} style={{ position: 'absolute', bottom: `${l}%`, left: 0, right: 0, height: 1, borderTop: l === 20 ? `1px dashed ${C.red}66` : `1px dotted ${C.muted}44` }}><span style={{ position: 'absolute', right: 6, top: -14, fontFamily: 'Inter', fontSize: 9, color: C.muted }}>{l}%</span></div>))}
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', zIndex: 2 }}>
+                  <div style={{ fontFamily: 'Oswald', fontSize: 28, fontWeight: 700, color: C.text, textShadow: `0 2px 8px ${C.bg}` }}>{porcentaje.toFixed(1)}%</div>
+                  <div style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: C.textDim }}>{nivelGalones.toLocaleString()} / {t.capacidad.toLocaleString()} {t.unidad}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>Medición:</span>
+                <input type="number" value={t.nivelCm} onChange={e => ajustarNivelCm(id, e.target.value)} style={{ width: 70, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 6px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, textAlign: 'right' }} />
+                <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>cm</span>
+                <span style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginLeft: 4 }}>→</span>
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: t.color, fontWeight: 600 }}>{nivelGalones.toLocaleString()} {t.unidad}</span>
+              </div>
+              <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginBottom: 8 }}>Altura: {t.alturaTotalCm} cm · Cap: {t.capacidad.toLocaleString()} {t.unidad}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <div style={{ background: C.bg, borderRadius: 6, padding: '6px 8px' }}><div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>Días restantes</div><div style={{ fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, color: diasRestantes <= 3 ? C.red : diasRestantes <= 7 ? C.amber : C.green }}>{diasRestantes <= 0 ? '<1' : diasRestantes} días</div></div>
+                <div style={{ background: C.bg, borderRadius: 6, padding: '6px 8px' }}><div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>Consumo/día</div><div style={{ fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, color: C.textDim }}>{t.consumoDiario}</div></div>
+              </div>
+            </div>);
+          })}
+        </div>
+        <div style={{ background: C.tealSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, display: 'flex', gap: 10 }}>
+          <I.ShieldCheck size={16} color={C.teal} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim, lineHeight: 1.6 }}>Las <b style={{ color: C.red }}>alertas</b> se activan cuando un tanque cae por debajo del 20%. Las <b>tablas de calibración</b> usan la fórmula del cilindro horizontal de Servcentro Negociaciones Cruz de Mayo.</div>
+        </div>
+      </div>);
+    }
+
+    /* ===================== ADMIN: COMPROBANTES ===================== */
+    function ComprobantesAdmin({ estacion, ventas, setVentas, productos }) {
+      const isMobile = useIsMobile();
+      const [filtro, setFiltro] = useState('todos');
+      const [filtroTrabajador, setFiltroTrabajador] = useState('todos');
+      const [busqueda, setBusqueda] = useState('');
+      const [showPreview, setShowPreview] = useState(null);
+      const [showCrear, setShowCrear] = useState(false);
+      const [tipoComp, setTipoComp] = useState('boleta');
+      const [ruc, setRuc] = useState(''); const [razonSocial, setRazonSocial] = useState('');
+      const [dniCliente, setDniCliente] = useState(''); const [nombreCliente, setNombreCliente] = useState('');
+      const [placa, setPlaca] = useState('');
+      const [metodoPago, setMetodoPago] = useState('transferencia');
+      const [productoId, setProductoId] = useState('diesel');
+      const [modo, setModo] = useState('galones');
+      const [valor, setValor] = useState('');
+      const [itemsCarrito, setItemsCarrito] = useState([]);
+      const [guardado, setGuardado] = useState(false);
+
+      function agregarItemCarrito() {
+        const p = productos.find(pp => pp.id === productoId); const num = parseFloat(valor) || 0;
+        if (num <= 0) return;
+        const galones = modo === 'galones' ? num : num / p.precio;
+        const soles = modo === 'soles' ? num : num * p.precio;
+        setItemsCarrito(prev => [...prev, { productoId, modo, valor: num, producto: p, galones, soles }]);
+        setValor('');
+      }
+      function eliminarItem(idx) { setItemsCarrito(prev => prev.filter((_, i) => i !== idx)); }
+      function crearComprobante() {
+        const p = productos.find(pp => pp.id === productoId); const num = parseFloat(valor) || 0;
+        let itemsVenta = [];
+        if (itemsCarrito.length > 0) { itemsVenta = itemsCarrito.map(item => ({ producto: item.producto.nombre, cant: `${item.galones.toFixed(2)} ${item.producto.unidad}`, precioUnitario: item.producto.precio, total: item.soles })); }
+        else if (num > 0) { const galones = modo === 'galones' ? num : num / p.precio; const soles = modo === 'soles' ? num : num * p.precio; itemsVenta = [{ producto: p.nombre, cant: `${galones.toFixed(2)} ${p.unidad}`, precioUnitario: p.precio, total: soles }]; }
+        if (itemsVenta.length === 0) return;
+        const totalFinal = itemsVenta.reduce((a, it) => a + it.total, 0);
+        const itemPrincipal = itemsVenta.reduce((a, b) => a.total > b.total ? a : b);
+        const now = new Date();
+        const nuevaVenta = { fecha: formatFechaCorta(new Date()), hora: now.toTimeString().slice(0, 5), producto: itemPrincipal.producto, cant: itemPrincipal.cant, precioUnitario: itemPrincipal.precioUnitario, total: totalFinal, metodo: METODOS.find(m => m.id === metodoPago)?.label || 'Transferencia', comp: tipoComp === 'factura' ? 'Factura' : 'Boleta', serieBoleta: generarNumeroComprobante('boleta'), serieFactura: tipoComp === 'factura' ? generarNumeroComprobante('factura') : null, ruc: tipoComp === 'factura' ? ruc : null, razonSocial: tipoComp === 'factura' ? razonSocial : null, dniCliente: tipoComp === 'boleta' && dniCliente ? dniCliente : null, nombreCliente: tipoComp === 'boleta' && nombreCliente ? nombreCliente : null, placa: placa || null, items: itemsVenta, itemCount: itemsVenta.length, esBancarizacion: true, trabajador: 'Admin' };
+        setVentas(prev => [nuevaVenta, ...prev]); setGuardado(true); setTimeout(() => setGuardado(false), 2500);
+        const ventaParaApi = { ...nuevaVenta, cliente: { nombre: nombreCliente || razonSocial || 'CLIENTE VARIOS', ruc: tipoComp === 'factura' ? ruc : null, dni: tipoComp !== 'factura' ? dniCliente : null, direccion: null }, items: itemsVenta.map(it => ({ nombre: it.producto, precioUnitario: it.precioUnitario, total: it.total, unidad: it.cant.includes('gal') ? 'gal' : it.cant.includes('litros') ? 'litros' : 'kg' })) };
+        emitirComprobanteElectronico(ventaParaApi).then(res => {
+          if (res.ok) console.log('📄 Comprobante enviado a SUNAT:', res.data);
+          else console.warn('⚠️ No se pudo emitir electrónicamente:', res.error);
+        });
+        setRuc(''); setRazonSocial(''); setDniCliente(''); setNombreCliente(''); setPlaca(''); setItemsCarrito([]); setValor('');
+      }
+
+      const productoActual = productos.find(p => p.id === productoId); const numActual = parseFloat(valor) || 0;
+      const trabajadoresUnicos = [...new Set(ventas.map(v => v.trabajador).filter(Boolean))];
+      const ventasConComprobante = ventas.filter(v => filtro === 'todos' ? true : filtro === 'boletas' ? v.comp === 'Boleta' : filtro === 'facturas' ? v.comp === 'Factura' : true).filter(v => filtroTrabajador === 'todos' ? true : v.trabajador === filtroTrabajador).filter(v => !busqueda ? true : (v.producto || '').toLowerCase().includes(busqueda.toLowerCase()) || (v.serieBoleta || '').toLowerCase().includes(busqueda.toLowerCase()) || (v.serieFactura || '').toLowerCase().includes(busqueda.toLowerCase()) || (v.trabajador || '').toLowerCase().includes(busqueda.toLowerCase()));
+      const totalBoletas = ventas.filter(v => v.comp === 'Boleta').length;
+      const totalFacturas = ventas.filter(v => v.comp === 'Factura').length;
+      const montoBoletas = ventas.filter(v => v.comp === 'Boleta').reduce((a, v) => a + v.total, 0);
+      const montoFacturas = ventas.filter(v => v.comp === 'Factura').reduce((a, v) => a + v.total, 0);
+
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
+          <KpiCard label="Total comprobantes" value={ventas.length} sub="emitidos hoy" color={C.amber} />
+          <KpiCard label="Boletas" value={totalBoletas} sub={money(montoBoletas)} color={C.teal} />
+          <KpiCard label="Facturas" value={totalFacturas} sub={money(montoFacturas)} color={C.green} />
+          <KpiCard label="RUC asignado" value={EMPRESA.ruc} sub={EMPRESA.razonSocial} color={C.textDim} />
+        </div>
+        <div style={{ background: C.tealSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, display: 'flex', gap: 12 }}>
+          <I.Building2 size={18} color={C.teal} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div><div style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 600, color: C.teal }}>{EMPRESA.razonSocial}</div><div style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim, marginTop: 2 }}>RUC: {EMPRESA.ruc} · {EMPRESA.direccion}</div></div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><I.FilePlus size={16} color={C.green} /><span style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 600, color: C.text }}>Bancarización</span><span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>— Crear comprobante manual</span></div>
+          <button onClick={() => setShowCrear(true)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.green, color: C.bg, border: 'none', borderRadius: 8, padding: '9px 16px', fontFamily: 'Inter', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}><I.Plus size={14} /> Crear comprobante</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[{ id: 'todos', label: 'Todos', count: ventas.length }, { id: 'boletas', label: 'Boletas', count: totalBoletas }, { id: 'facturas', label: 'Facturas', count: totalFacturas }].map(f => (
+                <button key={f.id} onClick={() => setFiltro(f.id)} type="button" style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${filtro === f.id ? C.amber : C.border}`, background: filtro === f.id ? C.amberSoft : C.panel, color: filtro === f.id ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {f.label} <span style={{ background: filtro === f.id ? C.amber : C.panelLight, color: filtro === f.id ? C.bg : C.muted, padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontFamily: 'JetBrains Mono' }}>{f.count}</span>
+                </button>
+              ))}
+            </div>
+            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por producto, serie o trabajador..." style={{ width: 240, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 12px', color: C.text, fontFamily: 'Inter', fontSize: 12.5 }} />
+          </div>
+          {trabajadoresUnicos.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <I.User size={13} color={C.muted} /><span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>Trabajador:</span>
+              {[{ id: 'todos', label: 'Todos' }, ...trabajadoresUnicos.map(t => ({ id: t, label: t }))].map(t => (
+                <button key={t.id} onClick={() => setFiltroTrabajador(t.id)} type="button" style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${filtroTrabajador === t.id ? C.teal : C.border}`, background: filtroTrabajador === t.id ? C.tealSoft : 'transparent', color: filtroTrabajador === t.id ? C.teal : C.muted, fontFamily: 'Inter', fontSize: 11.5, fontWeight: 500, cursor: 'pointer' }}>{t.label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {ventasConComprobante.length === 0 && (<div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 30, textAlign: 'center' }}><div style={{ fontSize: 28, marginBottom: 8 }}>📄</div><div style={{ fontFamily: 'Inter', fontSize: 14, color: C.textDim }}>No se encontraron comprobantes</div></div>)}
+          {ventasConComprobante.map((v, i) => {
+            const esFactura = v.comp === 'Factura'; const serie = esFactura ? v.serieFactura : v.serieBoleta;
+            return (<div key={i} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 100 }}>
+                  <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, background: esFactura ? C.greenSoft : C.tealSoft, color: esFactura ? C.green : C.teal }}>{v.comp}</span>
+                  <div style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: C.text, marginTop: 4, fontWeight: 600 }}>{serie}</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.text, fontWeight: 500 }}>{v.producto}</div>
+                  <div style={{ fontFamily: 'Inter', fontSize: 11.5, color: C.muted }}>{v.cant} · {v.metodo}</div>
+                  {v.trabajador && <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.teal, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><I.User size={10} color={C.teal} /> {v.trabajador}{v.esBancarizacion && <span style={{ fontSize: 9, color: C.green, marginLeft: 4 }}>(Bancarización)</span>}</div>}
+                </div>
+                <div style={{ textAlign: 'right', minWidth: 80 }}><div style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: C.textDim }}>{v.fecha}</div><div style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: C.muted }}>{v.hora}</div></div>
+                <div style={{ textAlign: 'right', minWidth: 80 }}><div style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: C.amber }}>{money(v.total)}</div></div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => setShowPreview(v)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 10px', color: C.textDim, cursor: 'pointer', fontFamily: 'Inter', fontSize: 11.5 }}><I.Eye size={13} /> Ver</button>
+                </div>
+              </div>
+              {esFactura && <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}`, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>RUC: <span style={{ color: C.textDim }}>{v.ruc || '—'}</span></span>
+                <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>Razón Social: <span style={{ color: C.textDim }}>{v.razonSocial || '—'}</span></span>
+              </div>}
+            </div>);
+          })}
+        </div>
+
+        {/* MODAL CREAR COMPROBANTE */}
+        {showCrear && (<div onClick={() => setShowCrear(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, width: '100%', maxWidth: 520, maxHeight: '92vh', overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><I.FileText size={18} color={C.green} /><span style={{ fontFamily: 'Inter', fontSize: 16, fontWeight: 700, color: C.text }}>Crear Comprobante</span></div>
+              <button onClick={() => setShowCrear(false)} type="button" style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer' }}><I.X size={18} /></button>
+            </div>
+            <div style={{ fontFamily: 'Inter', fontSize: 11.5, color: C.muted }}>Para bancarización de pagos</div>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Tipo de comprobante</div>
+              <div style={{ display: 'flex', gap: 8 }}>{[{ id: 'boleta', label: 'Boleta de Venta', color: C.teal }, { id: 'factura', label: 'Factura', color: C.green }].map(t => (<button key={t.id} onClick={() => setTipoComp(t.id)} type="button" style={{ flex: 1, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', border: `1.5px solid ${tipoComp === t.id ? t.color : C.border}`, background: tipoComp === t.id ? `${t.color}22` : C.bg, color: tipoComp === t.id ? t.color : C.textDim, fontFamily: 'Inter', fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>{t.label}</button>))}</div></div>
+            {tipoComp === 'factura' ? (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase' }}>RUC</div><input placeholder="RUC (11 dígitos)" value={ruc} onChange={e => setRuc(e.target.value)} maxLength={11} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>) : (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase' }}>DNI</div><input placeholder="DNI (8 dígitos)" value={dniCliente} onChange={e => setDniCliente(e.target.value)} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>)}
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Placa (opcional)</div><input placeholder="ABC-123" value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono', letterSpacing: 1 }} /></div>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Producto</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>{productos.map(p => { const sel = p.id === productoId; return (<button key={p.id} onClick={() => setProductoId(p.id)} type="button" style={{ padding: '10px 8px', borderRadius: 8, cursor: 'pointer', textAlign: 'center', border: `1.5px solid ${sel ? p.color : C.border}`, background: sel ? p.soft : C.bg }}><div style={{ fontFamily: 'Inter', fontSize: 12, color: C.text, fontWeight: 500 }}>{p.nombre}</div><div style={{ fontFamily: 'JetBrains Mono', fontSize: 13, color: p.color, fontWeight: 700, marginTop: 2 }}>S/ {p.precio.toFixed(2)}</div></button>); })}</div></div>
+            <div><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase' }}>Cantidad</span>
+                <div style={{ display: 'flex', gap: 4 }}><button onClick={() => setModo('galones')} type="button" style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${modo === 'galones' ? C.amber : C.border}`, background: modo === 'galones' ? C.amberSoft : 'transparent', color: modo === 'galones' ? C.amber : C.muted, fontSize: 11, fontFamily: 'Inter', cursor: 'pointer' }}>Galones</button>
+                  <button onClick={() => setModo('soles')} type="button" style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${modo === 'soles' ? C.amber : C.border}`, background: modo === 'soles' ? C.amberSoft : 'transparent', color: modo === 'soles' ? C.amber : C.muted, fontSize: 11, fontFamily: 'Inter', cursor: 'pointer' }}>Soles</button></div></div>
+              <div style={{ display: 'flex', gap: 8 }}><input type="number" step="0.01" placeholder={modo === 'galones' ? 'Galones' : 'Monto S/'} value={valor} onChange={e => setValor(e.target.value)} style={{ flex: 1, ...getInputStyle() }} />
+                {numActual > 0 && <button onClick={agregarItemCarrito} type="button" style={{ background: C.tealSoft, border: `1px solid ${C.teal}44`, borderRadius: 8, padding: '9px 14px', color: C.teal, cursor: 'pointer', fontFamily: 'Inter', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><I.Plus size={13} /> Agregar</button>}</div></div>
+            {itemsCarrito.length > 0 && (<div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 8 }}>🛒 Items ({itemsCarrito.length})</div>
+              {itemsCarrito.map((item, idx) => (<div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: C.panel, borderRadius: 6, border: `1px solid ${C.border}`, marginBottom: 4 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: item.producto.color }} />
+                <span style={{ fontFamily: 'Inter', fontSize: 11.5, color: C.textDim, flex: 1 }}>{item.producto.nombre}</span>
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 11.5, color: C.text, fontWeight: 600 }}>{money(item.soles)}</span>
+                <button onClick={() => eliminarItem(idx)} type="button" style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 2 }}><I.Minus size={12} /></button>
+              </div>))}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6, paddingTop: 6, borderTop: `1px solid ${C.border}` }}><span style={{ fontFamily: 'JetBrains Mono', fontSize: 13, color: C.amber, fontWeight: 700 }}>Total: {money(itemsCarrito.reduce((a, it) => a + it.soles, 0))}</span></div>
+            </div>)}
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Método de pago</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>{METODOS.map(m => { const sel = m.id === metodoPago; return (<button key={m.id} onClick={() => setMetodoPago(m.id)} type="button" style={{ padding: '8px 4px', borderRadius: 8, cursor: 'pointer', textAlign: 'center', border: `1.5px solid ${sel ? C.amber : C.border}`, background: sel ? C.amberSoft : C.bg, color: sel ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 11, fontWeight: 500 }}>{m.label}</button>); })}</div></div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <button onClick={() => setShowCrear(false)} type="button" style={{ flex: 1, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, color: C.textDim, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={crearComprobante} type="button" style={{ flex: 1.5, background: guardado ? C.green : C.amber, color: C.bg, border: 'none', borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{guardado ? '✅ Comprobante creado' : '📄 Crear y agregar al historial'}</button>
+            </div>
+          </div>
+        </div>)}
+
+        {/* MODAL VISTA PREVIA */}
+        {showPreview && (<div onClick={() => setShowPreview(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, width: '100%', maxWidth: 360, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ background: '#fff', borderRadius: '14px 14px 0 0', padding: '16px 20px', fontFamily: 'Courier New, monospace', fontSize: 10.5, color: '#000', lineHeight: 1.3 }}>
+              <div style={{ textAlign: 'center', marginBottom: 4 }}><span style={{ fontSize: '24px' }}>⛽</span></div>
+              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 }}>GRIFOS KALA</div>
+              <div style={{ textAlign: 'center', fontSize: 9, marginTop: 2 }}>{EMPRESA.razonSocial}</div>
+              <div style={{ textAlign: 'center', fontSize: 9 }}>{EMPRESA.direccion}</div>
+              <div style={{ textAlign: 'center', fontSize: 9 }}>{EMPRESA.distrito}</div>
+              <div style={{ textAlign: 'center', fontSize: 9 }}>TEL: {EMPRESA.telefono}</div>
+              <div style={{ borderTop: '2px dashed #000', margin: '8px 0' }} />
+              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}>RUC: {EMPRESA.ruc}</div>
+              <div style={{ borderTop: '2px dashed #000', margin: '8px 0' }} />
+              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 12 }}>{showPreview.comp === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA'}</div>
+              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 13, marginBottom: 4 }}>{showPreview.comp === 'Factura' ? showPreview.serieFactura : showPreview.serieBoleta}</div>
+              <div style={{ borderTop: '2px dashed #000', margin: '8px 0' }} />
+              <div style={{ fontSize: 10, lineHeight: 1.5 }}>
+                <div>CLIENTE : {showPreview.razonSocial || showPreview.nombreCliente || 'CLIENTE VARIOS'}</div>
+                {showPreview.comp === 'Factura' ? <div>RUC : {showPreview.ruc || '—'}</div> : <div>DNI : {showPreview.dniCliente || '—'}</div>}
+                {showPreview.comp === 'Factura' && <div>DIRECCIÓN: {showPreview.direccion || '—'}</div>}
+              </div>
+              <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}><span>F. EMISIÓN: {showPreview.fecha}</span><span>HORA: {showPreview.hora}</span></div>
+              <div style={{ fontSize: 10 }}>MONEDA: SOLES</div>
+              <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+              <div style={{ display: 'flex', fontWeight: 'bold', fontSize: 9, borderBottom: '1px solid #000', paddingBottom: 3, marginBottom: 3 }}>
+                <span style={{ width: 35 }}>CANT</span><span style={{ width: 25 }}>UM</span><span style={{ flex: 1 }}>| DESCRIPCIÓN</span><span style={{ width: 40, textAlign: 'right' }}>P/U</span><span style={{ width: 50, textAlign: 'right' }}>TOTAL</span>
+              </div>
+              {(showPreview.items || []).map((item, idx) => {
+                const um = item.unidad === 'gal' ? 'GLL' : item.unidad === 'litros' ? 'LTR' : 'UNI';
+                return (<div key={idx} style={{ display: 'flex', fontSize: 10, padding: '1px 0' }}>
+                  <span style={{ width: 35 }}>{(parseFloat(item.cant) || 0).toFixed(2)}</span>
+                  <span style={{ width: 25 }}>{um}</span>
+                  <span style={{ flex: 1 }}>| {(item.producto || '').toUpperCase()}</span>
+                  <span style={{ width: 40, textAlign: 'right' }}>{item.precioUnitario?.toFixed(2) || '—'}</span>
+                  <span style={{ width: 50, textAlign: 'right' }}>{item.total.toFixed(2)}</span>
+                </div>);
+              })}
+              <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+              {showPreview.comp === 'Factura' && <><div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 10 }}><span style={{ width: 100 }}>GRAVADA S/</span><span style={{ width: 55, textAlign: 'right' }}>{(showPreview.total / 1.18).toFixed(2)}</span></div><div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 10 }}><span style={{ width: 100 }}>IGV 18.00% S/</span><span style={{ width: 55, textAlign: 'right' }}>{(showPreview.total - showPreview.total / 1.18).toFixed(2)}</span></div></>}
+              <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', fontWeight: 'bold', fontSize: 13 }}><span style={{ width: 100 }}>TOTAL S/</span><span style={{ width: 55, textAlign: 'right' }}>{showPreview.total.toFixed(2)}</span></div>
+              <div style={{ borderTop: '2px dashed #000', margin: '6px 0' }} />
+              <div style={{ fontSize: 9.5, marginBottom: 4 }}><b>SON:</b> {numeroALetras(showPreview.total)}</div>
+              <div style={{ fontSize: 10, marginBottom: 3 }}>PAGO CON: {showPreview.metodo?.toUpperCase()} MONTO: {showPreview.total.toFixed(2)} VUELTO: 0</div>
+              <div style={{ fontSize: 10, marginBottom: 3 }}>CONDICIÓN DE PAGO: CONTADO</div>
+              {showPreview.placa && <div style={{ fontSize: 10, marginBottom: 3 }}>PLACA: {showPreview.placa}</div>}
+              <div style={{ fontSize: 10, marginBottom: 8 }}>ATENDIDO POR: {(showPreview.trabajador || '—').toUpperCase()}</div>
+              <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+              <div style={{ textAlign: 'center', fontSize: 8, color: '#666', marginBottom: 4 }}>Representación impresa de la</div>
+              <div style={{ textAlign: 'center', fontSize: 8, color: '#666', marginBottom: 4 }}>{showPreview.comp === 'Factura' ? 'Factura Electrónica' : 'Boleta de Venta'}</div>
+              <div style={{ textAlign: 'center', fontSize: 8, color: '#666', marginBottom: 8 }}>consulte su comprobante en www.facel.pe</div>
+              <div style={{ borderTop: '2px dashed #000', margin: '6px 0' }} />
+              <div style={{ textAlign: 'center', fontSize: 10, fontWeight: 'bold' }}>¡Gracias por su preferencia!</div>
+              <div style={{ textAlign: 'center', fontSize: 8, color: '#666', marginTop: 4 }}>****************************************</div>
+            </div>
+            <div style={{ padding: '14px 20px', display: 'flex', gap: 8, borderBottomLeftRadius: 14, borderBottomRightRadius: 14, background: C.panel }}>
+              <button onClick={() => setShowPreview(null)} type="button" style={{ flex: 1, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 0', fontFamily: 'Inter', fontSize: 13, color: C.textDim, cursor: 'pointer' }}>Cerrar</button>
+            </div>
+          </div>
+        </div>)}
+      </div>);
+    }
+
+    /* ===================== CALENDARIO ANUAL POR TRABAJADOR ===================== */
+    function CalendarioAnual({ horario, year, diasOverrides, onDayClick }) {
+      const isMobile = useIsMobile(768);
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      const dayNames = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+      const today = new Date();
+
+      function getDayKey(year, month, day) {
+        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+
+      function isWorkingDay(year, month, day) {
+        const key = getDayKey(year, month, day);
+        if (diasOverrides && key in diasOverrides) return !diasOverrides[key];
+        const dow = (new Date(year, month, day).getDay() + 6) % 7;
+        const h = horario.find(x => x.dia === DIAS[dow]);
+        return h && !h.libre;
+      }
+
+      const totalDiasTrabajo = (() => {
+        let c = 0;
+        for (let m = 0; m < 12; m++) {
+          const dim = new Date(year, m + 1, 0).getDate();
+          for (let d = 1; d <= dim; d++) {
+            if (isWorkingDay(year, m, d)) c++;
+          }
+        }
+        return c;
+      })();
+
+      return (<div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: '#22C55E', boxShadow: '0 0 6px #22C55E66' }} /><span style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.textDim, fontWeight: 500 }}>Trabaja</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: '#EF4444', boxShadow: '0 0 6px #EF444466' }} /><span style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.textDim, fontWeight: 500 }}>Descansa</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 12, height: 12, borderRadius: 3, background: 'transparent', border: `2px solid ${C.amber}`, boxShadow: '0 0 6px #E8A33D66' }} /><span style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.textDim, fontWeight: 500 }}>Hoy</span></div>
+
+          </div>
+          <span style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.muted }}>{totalDiasTrabajo} días de trabajo estimados en {year}</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
+          {monthNames.map((mn, monthIdx) => {
+            const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+            const firstDay = (new Date(year, monthIdx, 1).getDay() + 6) % 7;
+            const cells = [];
+            for (let i = 0; i < firstDay; i++) cells.push(null);
+            for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+            return (<div key={mn} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, fontWeight: 700, color: C.text, marginBottom: 6, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{mn}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 3 }}>
+                {dayNames.map((dn, i) => <div key={i} style={{ textAlign: 'center', fontFamily: 'Inter', fontSize: 8, color: C.muted, fontWeight: 600 }}>{dn}</div>)}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+                {cells.map((d, idx) => {
+                  if (d === null) return <div key={'e' + idx} />;
+                  const dateObj = new Date(year, monthIdx, d);
+                  const key = getDayKey(year, monthIdx, d);
+                  const trabaja = isWorkingDay(year, monthIdx, d);
+                  const isToday = dateObj.toDateString() === today.toDateString();
+                  return (
+                    <div
+                      key={d}
+                      onClick={() => onDayClick && onDayClick(key, trabaja)}
+                      title={`${d} de ${mn} — ${trabaja ? 'Trabaja' : 'Descansa'} — Click para cambiar`}
+                      style={{
+                        aspectRatio: '1',
+                        borderRadius: 4,
+                        background: trabaja ? '#22C55E' : '#EF4444',
+                        border: isToday ? `2.5px solid ${C.amber}` : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: onDayClick ? 'pointer' : 'default',
+                        transition: 'all 0.15s ease',
+                        boxShadow: trabaja ? '0 1px 4px #22C55E44' : '0 1px 4px #EF444444',
+                      }}
+                    >
+                      <span style={{
+                        fontFamily: 'JetBrains Mono',
+                        fontSize: 7,
+                        color: '#fff',
+                        fontWeight: 700,
+                        textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                      }}>{d}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>);
+          })}
+        </div>
+      </div>);
+    }
+
+    /* ===================== ADMIN: TRABAJADORES ===================== */
+    function TrabajadoresAdmin() {
+      const isMobile = useIsMobile(768);
+      const [trabajadores, setTrabajadores] = useState(() => {
+        try {
+          const saved = localStorage.getItem('grifos_kala_trabajadores');
+          return saved ? JSON.parse(saved) : TRABAJADORES_INIT;
+        } catch { return TRABAJADORES_INIT; }
+      });
+      const [maquinas, setMaquinas] = useState(() => {
+        try {
+          const saved = localStorage.getItem('grifos_kala_maquinas');
+          return saved ? JSON.parse(saved) : MAQUINAS_INIT;
+        } catch { return MAQUINAS_INIT; }
+      });
+
+      useEffect(() => {
+        localStorage.setItem('grifos_kala_trabajadores', JSON.stringify(trabajadores));
+      }, [trabajadores]);
+      useEffect(() => {
+        localStorage.setItem('grifos_kala_maquinas', JSON.stringify(maquinas));
+      }, [maquinas]);
+      const [showModal, setShowModal] = useState(false);
+      const [editando, setEditando] = useState(null);
+      const [expandedId, setExpandedId] = useState(null);
+      const [calendarioAbiertoId, setCalendarioAbiertoId] = useState(null);
+      const anioActual = new Date().getFullYear();
+      const [vista, setVista] = useState('lista');
+      const [filtroEstacion, setFiltroEstacion] = useState('todas');
+      const [showMaquinasModal, setShowMaquinasModal] = useState(false);
+      const [diasOverrides, setDiasOverrides] = useState(() => {
+        const init = {};
+        TRABAJADORES_INIT.forEach(t => { if (t.diasOverrides) init[t.id] = t.diasOverrides; });
+        return init;
+      });
+
+      function toggleDia(trabajadorId, key, trabajaActual) {
+        setDiasOverrides(prev => {
+          const worker = prev[trabajadorId] || {};
+          const actual = worker[key];
+          let nuevo;
+          if (actual === undefined) {
+            nuevo = trabajaActual ? true : false;
+          } else {
+            nuevo = !actual;
+          }
+          const newWorker = { ...worker };
+          if (nuevo === undefined || nuevo === null) {
+            delete newWorker[key];
+          } else {
+            newWorker[key] = nuevo;
+          }
+          if (Object.keys(newWorker).length === 0) {
+            const result = { ...prev };
+            delete result[trabajadorId];
+            return result;
+          }
+          return { ...prev, [trabajadorId]: newWorker };
+        });
+      }
+
+      function guardarOverrides(trabajadorId) {
+        setTrabajadores(prev => prev.map(t => {
+          if (t.id !== trabajadorId) return t;
+          return { ...t, diasOverrides: diasOverrides[trabajadorId] || {} };
+        }));
+      }
+
+      // Form state
+      const [fNombre, setFNombre] = useState('');
+      const [fDni, setFDni] = useState('');
+      const [fUsuario, setFUsuario] = useState('');
+      const [fEstacion, setFEstacion] = useState(ESTACIONES[0]);
+      const [fHorario, setFHorario] = useState(() => DIAS.map(d => ({ dia: d, libre: true, ini: '06:00', fin: '14:00' })));
+      const [fMaquinas, setFMaquinas] = useState([]);
+
+      // Machine form
+      const [mNombre, setMNombre] = useState('');
+      const [mIsla, setMIsla] = useState('');
+      const [mMangueros, setMMangueros] = useState(4);
+      const [mEstacion, setMEstacion] = useState(ESTACIONES[0]);
+
+      function abrirCrear() {
+        setEditando(null);
+        setFNombre(''); setFDni(''); setFUsuario('');
+        setFEstacion(ESTACIONES[0]);
+        setFHorario(DIAS.map(d => ({ dia: d, libre: true, ini: '06:00', fin: '14:00' })));
+        setFMaquinas([]);
+        setShowModal(true);
+      }
+      function abrirEditar(t) {
+        setEditando(t.id);
+        setFNombre(t.nombre); setFDni(t.dni); setFUsuario(t.usuario);
+        setFEstacion(t.estacion);
+        setFHorario(t.horario.map(h => ({ ...h })));
+        setFMaquinas(t.maquinasAsignadas || []);
+        setShowModal(true);
+      }
+      const [errorModal, setErrorModal] = useState('');
+
+      function guardarTrabajador() {
+        setErrorModal('');
+        if (!fNombre.trim()) { setErrorModal('Ingresa el nombre completo.'); return; }
+        if (!fDni.trim() || fDni.trim().length !== 8) { setErrorModal('El DNI debe tener 8 dígitos.'); return; }
+        if (!fUsuario.trim()) { setErrorModal('Ingresa un usuario.'); return; }
+        const usuarioExiste = trabajadores.find(t => t.usuario === fUsuario.trim() && t.id !== editando);
+        if (usuarioExiste) { setErrorModal('Este usuario ya existe: ' + usuarioExiste.nombre); return; }
+        const dniExiste = trabajadores.find(t => t.dni === fDni.trim() && t.id !== editando);
+        if (dniExiste) { setErrorModal('Este DNI ya está registrado: ' + dniExiste.nombre); return; }
+        if (editando) {
+          setTrabajadores(prev => prev.map(t => {
+            if (t.id !== editando) return t;
+            return { ...t, nombre: fNombre.trim(), dni: fDni.trim(), usuario: fUsuario.trim(), estacion: fEstacion, horario: fHorario, maquinasAsignadas: fMaquinas };
+          }));
+        } else {
+          const nuevoId = trabajadores.length > 0 ? Math.max(...trabajadores.map(t => t.id)) + 1 : 1;
+          setTrabajadores(prev => [...prev, { id: nuevoId, nombre: fNombre.trim(), dni: fDni.trim(), usuario: fUsuario.trim(), estacion: fEstacion, horario: fHorario, maquinasAsignadas: fMaquinas }]);
+        }
+        setShowModal(false);
+      }
+      function eliminarTrabajador(id) {
+        setTrabajadores(prev => prev.filter(t => t.id !== id));
+      }
+      function toggleDiaLibre(idx) {
+        setFHorario(prev => prev.map((h, i) => i === idx ? { ...h, libre: !h.libre } : h));
+      }
+      function setHorarioDia(idx, campo, valor) {
+        setFHorario(prev => prev.map((h, i) => i === idx ? { ...h, [campo]: valor } : h));
+      }
+      function toggleMaquina(mId) {
+        setFMaquinas(prev => prev.includes(mId) ? prev.filter(x => x !== mId) : [...prev, mId]);
+      }
+      function agregarMaquina() {
+        if (!mNombre.trim() || !mIsla.trim()) return;
+        const nuevoId = 'm' + (maquinas.length + 1);
+        setMaquinas(prev => [...prev, { id: nuevoId, nombre: mNombre.trim(), isla: mIsla.trim(), mangueros: mMangueros, estado: 'Activa', estacion: mEstacion }]);
+        setMNombre(''); setMIsla(''); setMMangueros(4);
+        setShowMaquinasModal(false);
+      }
+      function eliminarMaquina(id) {
+        setMaquinas(prev => prev.filter(m => m.id !== id));
+        setTrabajadores(prev => prev.map(t => ({ ...t, maquinasAsignadas: (t.maquinasAsignadas || []).filter(x => x !== id) })));
+      }
+
+      const trabajadoresFiltrados = filtroEstacion === 'todas' ? trabajadores : trabajadores.filter(t => t.estacion === filtroEstacion);
+      const maquinasEstacion = maquinas.filter(m => m.estacion === fEstacion);
+
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={() => setVista('lista')} type="button" style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${vista === 'lista' ? C.amber : C.border}`, background: vista === 'lista' ? C.amberSoft : C.panel, color: vista === 'lista' ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12.5, fontWeight: 500, cursor: 'pointer' }}>📋 Lista</button>
+              <button onClick={() => setVista('horarios')} type="button" style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${vista === 'horarios' ? C.amber : C.border}`, background: vista === 'horarios' ? C.amberSoft : C.panel, color: vista === 'horarios' ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12.5, fontWeight: 500, cursor: 'pointer' }}>📅 Horarios</button>
+              <button onClick={() => setVista('maquinas')} type="button" style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${vista === 'maquinas' ? C.amber : C.border}`, background: vista === 'maquinas' ? C.amberSoft : C.panel, color: vista === 'maquinas' ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12.5, fontWeight: 500, cursor: 'pointer' }}>⛽ Máquinas</button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[{ id: 'todas', label: 'Todas' }, ...ESTACIONES.map(e => ({ id: e, label: e.split(' ').pop() }))].map(e => (
+                <button key={e.id} onClick={() => setFiltroEstacion(e.id)} type="button" style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${filtroEstacion === e.id ? C.teal : C.border}`, background: filtroEstacion === e.id ? C.tealSoft : 'transparent', color: filtroEstacion === e.id ? C.teal : C.muted, fontFamily: 'Inter', fontSize: 11, fontWeight: 500, cursor: 'pointer' }}>{e.label}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {vista !== 'maquinas' ? (
+              <button onClick={abrirCrear} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.amber, color: C.bg, border: 'none', borderRadius: 8, padding: '9px 16px', fontFamily: 'Inter', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}><I.Plus size={14} /> Nuevo trabajador</button>
+            ) : (
+              <button onClick={() => setShowMaquinasModal(true)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.amber, color: C.bg, border: 'none', borderRadius: 8, padding: '9px 16px', fontFamily: 'Inter', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}><I.Plus size={14} /> Nueva máquina</button>
+            )}
+          </div>
+        </div>
+
+        {/* VISTA: LISTA */}
+        {vista === 'lista' && (<div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {trabajadoresFiltrados.length === 0 && <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 30, textAlign: 'center' }}><div style={{ fontSize: 28, marginBottom: 8 }}>👷</div><div style={{ fontFamily: 'Inter', fontSize: 14, color: C.textDim }}>No hay trabajadores</div></div>}
+          {trabajadoresFiltrados.map(t => {
+            const expand = expandedId === t.id;
+            const maqAsignadas = (t.maquinasAsignadas || []).map(id => maquinas.find(m => m.id === id)).filter(Boolean);
+            const horasTrabajo = t.horario.filter(h => !h.libre).length * 8;
+            return (<div key={t.id} style={{ background: C.panel, border: `1px solid ${expand ? C.amber : C.border}`, borderRadius: 12, overflow: 'hidden', transition: 'border-color 0.2s' }}>
+              <div onClick={() => setExpandedId(expand ? null : t.id)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', cursor: 'pointer' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: C.panelLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter', fontWeight: 600, fontSize: 13, color: C.amber, flexShrink: 0 }}>{t.nombre.split(' ').map(n => n[0]).slice(0, 2).join('')}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: 'Inter', fontSize: 13.5, color: C.text, fontWeight: 500 }}>{t.nombre} <span style={{ color: C.muted, fontWeight: 400 }}>· DNI {t.dni}</span></div>
+                  <div style={{ fontFamily: 'Inter', fontSize: 11.5, color: C.muted, marginTop: 2 }}>{t.estacion} · usuario "{t.usuario}" · {horasTrabajo}h/semana</div>
+                </div>
+                {maqAsignadas.length > 0 && <div style={{ display: 'flex', gap: 4 }}>{maqAsignadas.map(m => <span key={m.id} style={{ background: C.amberSoft, color: C.amber, padding: '2px 8px', borderRadius: 4, fontSize: 10, fontFamily: 'Inter', fontWeight: 500 }}>{m.nombre}</span>)}</div>}
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={(e) => { e.stopPropagation(); abrirEditar(t); }} type="button" style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 10px', color: C.textDim, cursor: 'pointer', fontFamily: 'Inter', fontSize: 11 }}><I.Settings size={13} /></button>
+                  <button onClick={(e) => { e.stopPropagation(); eliminarTrabajador(t.id); }} type="button" style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: '5px 10px', color: C.red, cursor: 'pointer', fontFamily: 'Inter', fontSize: 11 }}><I.Trash2 size={13} /></button>
+                </div>
+                <I.ChevronDown size={16} color={C.muted} style={{ transform: expand ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', flexShrink: 0 }} />
+              </div>
+              {expand && (<div style={{ padding: '0 16px 16px', borderTop: `1px solid ${C.border}` }}>
+                <div style={{ marginTop: 14 }}>
+                  <div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Máquinas asignadas</div>
+                    {maqAsignadas.length === 0 ? <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, padding: 10, background: C.bg, borderRadius: 8, textAlign: 'center' }}>Sin máquinas asignadas</div> : (
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(220px, 1fr))', gap: 6 }}>
+                        {maqAsignadas.map(m => (
+                          <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: m.estado === 'Activa' ? C.green : C.amber, flexShrink: 0 }} />
+                            <div style={{ flex: 1 }}><div style={{ fontFamily: 'Inter', fontSize: 12, color: C.text }}>{m.nombre} · {m.isla}</div><div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>{m.mangueros} mangueros · {m.estado}</div></div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+                  <button onClick={(e) => { e.stopPropagation(); setCalendarioAbiertoId(calendarioAbiertoId === t.id ? null : t.id); }} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: calendarioAbiertoId === t.id ? C.amberSoft : C.bg, border: `1px solid ${calendarioAbiertoId === t.id ? C.amber : C.border}`, borderRadius: 8, padding: '8px 14px', color: calendarioAbiertoId === t.id ? C.amber : C.textDim, cursor: 'pointer', fontFamily: 'Inter', fontSize: 12, fontWeight: 600 }}>
+                    📅 {calendarioAbiertoId === t.id ? `Ocultar calendario ${anioActual}` : `Ver calendario anual ${anioActual}`}
+                    <I.ChevronDown size={13} style={{ transform: calendarioAbiertoId === t.id ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                  </button>
+                  {calendarioAbiertoId === t.id && (<div style={{ marginTop: 12 }} onClick={e => e.stopPropagation()}><CalendarioAnual horario={t.horario} year={anioActual} diasOverrides={diasOverrides[t.id] || {}} onDayClick={(key, trabaja) => toggleDia(t.id, key, trabaja)} /><div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}><button onClick={(e) => { e.stopPropagation(); guardarOverrides(t.id); }} type="button" style={{ padding: '8px 18px', borderRadius: 8, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Guardar cambios</button></div></div>)}
+                </div>
+              </div>)}
+            </div>);
+          })}
+        </div>)}
+
+        {/* VISTA: HORARIOS */}
+        {vista === 'horarios' && (<div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
+            <div style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 14 }}>📅 Horario semanal por trabajador</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {trabajadoresFiltrados.map(t => {
+                const initials = t.nombre.split(' ').map(n => n[0]).slice(0, 2).join('');
+                return (<div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: C.bg, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: C.panelLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter', fontSize: 10, color: C.amber, fontWeight: 600, flexShrink: 0 }}>{initials}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.nombre}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    {t.horario.map(h => (
+                      <div key={h.dia} style={{ textAlign: 'center', padding: '4px 6px', borderRadius: 6, minWidth: 48, background: h.libre ? C.panel : C.tealSoft, border: `1px solid ${h.libre ? C.border : C.teal}33` }}>
+                        <div style={{ fontFamily: 'Inter', fontSize: 8, color: C.muted, fontWeight: 600 }}>{h.dia}</div>
+                        {h.libre ? <div style={{ fontFamily: 'Inter', fontSize: 7, color: C.muted, marginTop: 1 }}>Libre</div> : <div style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: C.teal, marginTop: 1 }}>{h.ini}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>);
+              })}
+            </div>
+          </div>
+
+          {/* Calendario mensual */}
+          {(() => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const firstDay = (new Date(year, month, 1).getDay() + 6) % 7;
+            const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+            const workerColors = [C.teal, C.amber, '#E91E63', '#6C63FF', '#FF9800', '#4CAF50'];
+            const calendarDays = [];
+            for (let i = 0; i < firstDay; i++) calendarDays.push(null);
+            for (let d = 1; d <= daysInMonth; d++) calendarDays.push(d);
+            return (<div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 600, color: C.text }}>📆 {monthNames[month]} {year}</div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: C.tealSoft, border: `1px solid ${C.teal}44` }} /><span style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>Trabaja</span></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: C.bg, border: `1px solid ${C.border}` }} /><span style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>Descansa</span></div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                {dayNames.map(d => <div key={d} style={{ textAlign: 'center', fontFamily: 'Inter', fontSize: 10, color: C.muted, fontWeight: 600, padding: '4px 0' }}>{d}</div>)}
+                {calendarDays.map((day, idx) => {
+                  if (day === null) return <div key={'empty_' + idx} />;
+                  const dateObj = new Date(year, month, day);
+                  const dayOfWeek = (dateObj.getDay() + 6) % 7;
+                  const dayName = DIAS[dayOfWeek];
+                  const isToday = day === now.getDate();
+                  const workersWorking = trabajadoresFiltrados.filter(t => {
+                    const h = t.horario.find(h => h.dia === dayName);
+                    return h && !h.libre;
+                  });
+                  const allFree = workersWorking.length === 0;
+                  return (<div key={day} style={{ textAlign: 'center', padding: '6px 2px', borderRadius: 8, minHeight: 60, background: allFree ? C.bg : `${C.teal}11`, border: `1px solid ${isToday ? C.amber : allFree ? C.border : `${C.teal}33`}`, position: 'relative' }}>
+                    <div style={{ fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: isToday ? 700 : 500, color: isToday ? C.amber : C.text }}>{day}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 4 }}>
+                      {workersWorking.slice(0, 3).map((w, wi) => {
+                        const wh = w.horario.find(h => h.dia === dayName);
+                        const col = workerColors[w.id % workerColors.length];
+                        return (<div key={w.id} style={{ padding: '1px 3px', borderRadius: 3, background: `${col}22`, border: `1px solid ${col}44` }}>
+                          <span style={{ fontFamily: 'Inter', fontSize: 7, color: col, fontWeight: 600 }}>{w.nombre.split(' ')[0]}</span>
+                        </div>);
+                      })}
+                      {workersWorking.length > 3 && <div style={{ fontFamily: 'Inter', fontSize: 7, color: C.muted }}>+{workersWorking.length - 3}</div>}
+                    </div>
+                  </div>);
+                })}
+              </div>
+            </div>);
+          })()}
+        </div>)}
+
+        {/* VISTA: MÁQUINAS */}
+        {vista === 'maquinas' && (<div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {ESTACIONES.map(est => {
+            const maqEst = maquinas.filter(m => m.estacion === est);
+            if (filtroEstacion !== 'todas' && !est.includes(filtroEstacion.split(' ').pop())) return null;
+            return (<div key={est}>
+              <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{est}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+                {maqEst.map(m => {
+                  const asignados = trabajadores.filter(t => (t.maquinasAsignadas || []).includes(m.id));
+                  return (<div key={m.id} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: m.estado === 'Activa' ? C.green : m.estado === 'Mantenimiento' ? C.amber : C.red }} />
+                        <div><div style={{ fontFamily: 'Inter', fontSize: 13, color: C.text, fontWeight: 600 }}>{m.nombre}</div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>⛽ {m.isla} · {m.mangueros} mangueros</div></div>
+                      </div>
+                      <button onClick={() => eliminarMaquina(m.id)} type="button" style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 4 }}><I.Trash2 size={13} /></button>
+                    </div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginBottom: 6 }}>Estado: <span style={{ color: m.estado === 'Activa' ? C.green : C.amber }}>{m.estado}</span></div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginBottom: 6 }}>Operadores asignados:</div>
+                    {asignados.length === 0 ? <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, fontStyle: 'italic' }}>Sin asignar</div> : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {asignados.map(t => (
+                          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: C.bg, borderRadius: 6 }}>
+                            <div style={{ width: 20, height: 20, borderRadius: '50%', background: C.panelLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter', fontSize: 8, color: C.amber, fontWeight: 600, flexShrink: 0 }}>{t.nombre.split(' ').map(n => n[0]).slice(0, 2).join('')}</div>
+                            <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.textDim }}>{t.nombre}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>);
+                })}
+                {maqEst.length === 0 && <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, padding: 16, textAlign: 'center' }}>No hay máquinas registradas</div>}
+              </div>
+            </div>);
+          })}
+        </div>)}
+
+        {/* MODAL: CREAR/EDITAR TRABAJADOR */}
+        {showModal && (<div onClick={() => setShowModal(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><I.Users size={18} color={C.amber} /><span style={{ fontFamily: 'Inter', fontSize: 16, fontWeight: 700, color: C.text }}>{editando ? 'Editar Trabajador' : 'Nuevo Trabajador'}</span></div>
+              <button onClick={() => setShowModal(false)} type="button" style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer' }}><I.X size={18} /></button>
+            </div>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Datos personales</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>Nombre completo</div><input placeholder="Ej. Juan Pérez" value={fNombre} onChange={e => setFNombre(e.target.value)} style={getInputStyle()} /></div>
+                <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>DNI</div><input placeholder="8 dígitos" value={fDni} onChange={e => setFDni(e.target.value)} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
+                <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>Usuario</div><input placeholder="Ej. jperez" value={fUsuario} onChange={e => setFUsuario(e.target.value)} style={getInputStyle()} /></div>
+                <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>Estación</div>
+                  <select value={fEstacion} onChange={e => setFEstacion(e.target.value)} style={{ ...getInputStyle(), cursor: 'pointer' }}>{ESTACIONES.map(e => <option key={e} value={e} style={{ background: C.panel }}>{e}</option>)}</select>
+                </div>
+              </div>
+            </div>
+
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Máquinas surtidoras ({maquinasEstacion.length} disponibles)</div>
+              {maquinasEstacion.length === 0 ? <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, padding: 12, background: C.bg, borderRadius: 8, textAlign: 'center' }}>No hay máquinas en esta estación. Crea una en la pestaña Máquinas.</div> : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6 }}>
+                  {maquinasEstacion.map(m => {
+                    const sel = fMaquinas.includes(m.id);
+                    return (<button key={m.id} onClick={() => toggleMaquina(m.id)} type="button" style={{ padding: '10px 8px', borderRadius: 8, cursor: 'pointer', textAlign: 'center', border: `1.5px solid ${sel ? C.amber : C.border}`, background: sel ? C.amberSoft : C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: m.estado === 'Activa' ? C.green : C.amber }} />
+                      <div style={{ fontFamily: 'Inter', fontSize: 11, color: sel ? C.amber : C.textDim, fontWeight: 500 }}>{m.nombre}</div>
+                      <div style={{ fontFamily: 'Inter', fontSize: 9, color: C.muted }}>{m.isla}</div>
+                      {sel && <I.Check size={12} color={C.amber} />}
+                    </button>);
+                  })}
+                </div>
+              )}
+            </div>
+            {errorModal && <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderRadius: 8, background: C.redSoft, border: `1px solid ${C.red}44`, fontFamily: 'Inter', fontSize: 12.5, color: C.red }}><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> {errorModal}</div>}
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <button onClick={() => { setShowModal(false); setErrorModal(''); }} type="button" style={{ flex: 1, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, color: C.textDim, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={guardarTrabajador} type="button" style={{ flex: 1.5, background: C.amber, color: C.bg, border: 'none', borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{editando ? '💾 Guardar cambios' : '✅ Crear trabajador'}</button>
+            </div>
+          </div>
+        </div>)}
+
+        {/* MODAL: CREAR MÁQUINA */}
+        {showMaquinasModal && (<div onClick={() => setShowMaquinasModal(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, width: '100%', maxWidth: 400, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><I.Fuel size={18} color={C.amber} /><span style={{ fontFamily: 'Inter', fontSize: 16, fontWeight: 700, color: C.text }}>Nueva Máquina</span></div>
+              <button onClick={() => setShowMaquinasModal(false)} type="button" style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer' }}><I.X size={18} /></button>
+            </div>
+            <Field label="Nombre"><input placeholder="Ej. Máquina 3" value={mNombre} onChange={e => setMNombre(e.target.value)} style={getInputStyle()} /></Field>
+            <Field label="Isla"><input placeholder="Ej. Isla Norte" value={mIsla} onChange={e => setMIsla(e.target.value)} style={getInputStyle()} /></Field>
+            <Field label="Estación"><select value={mEstacion} onChange={e => setMEstacion(e.target.value)} style={{ ...getInputStyle(), cursor: 'pointer' }}>{ESTACIONES.map(e => <option key={e} value={e} style={{ background: C.panel }}>{e}</option>)}</select></Field>
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <button onClick={() => setShowMaquinasModal(false)} type="button" style={{ flex: 1, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, color: C.textDim, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={agregarMaquina} type="button" style={{ flex: 1.5, background: C.amber, color: C.bg, border: 'none', borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>✅ Crear máquina</button>
+            </div>
+          </div>
+        </div>)}
+      </div>);
+    }
+
+    /* ===================== ADMIN: REPORTES ===================== */
+    function ReportesAdmin() {
+      const isMobile = useIsMobile();
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 12 }}>
+          <KpiCard label="Ventas del mes" value={money(247892.50)} sub="↑ 12% vs mes anterior" color={C.amber} />
+          <KpiCard label="Galones totales" value="38,421" sub="Todos los productos" color={C.teal} />
+          <KpiCard label="Ticket promedio" value={money(189.30)} sub="Por transacción" color={C.green} />
+        </div>
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}><I.TrendingUp size={15} color={C.teal} /><span style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 500, color: C.text }}>Distribución de ventas por producto</span></div>
+          <ResponsiveContainer width="100%" height={250}>
+            <PieChart>
+              <Pie data={[{ name: 'Diésel B5', value: 124500 }, { name: 'Diésel D-B5', value: 78200 }, { name: 'Regular', value: 31900 }, { name: 'Urea', value: 13292 }]} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="value">
+                <Cell fill={C.amber} />
+                <Cell fill="#D4A017" />
+                <Cell fill={C.teal} />
+                <Cell fill={C.green} />
+              </Pie>
+              <Tooltip contentStyle={{ background: C.panelLight, border: `1px solid ${C.border}`, borderRadius: 8, fontFamily: 'Inter', fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
+            {[{ color: C.amber, label: 'Diésel B5' }, { color: '#D4A017', label: 'Diésel D-B5' }, { color: C.teal, label: 'Regular' }, { color: C.green, label: 'Urea' }].map(item => (
+              <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: item.color }} /><span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>{item.label}</span></div>
+            ))}
+          </div>
+        </div>
+        <div style={{ background: C.tealSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, display: 'flex', gap: 10 }}>
+          <I.FileOutput size={16} color={C.teal} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim, lineHeight: 1.6 }}>Los reportes se actualizan en tiempo real. Puedes exportar datos en formato <b>Excel</b> o <b>PDF</b> desde la sección de configuración.</div>
+        </div>
+      </div>);
+    }
+
+    /* ===================== WORKER DASHBOARD ===================== */
+    /* ===================== WORKER: ICONOS PEQUEÑOS ===================== */
+    const WI = {
+      Fuel: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><path d="M15 10h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2v0a2 2 0 0 0 2-2V9l-3-3"/><path d="M3 22h12"/><path d="M7 7v5"/></svg>,
+      Droplet: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>,
+      Gauge: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>,
+      CreditCard: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>,
+      Banknote: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>,
+      Smartphone: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>,
+      ArrowLeftRight: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>,
+      FileText: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>,
+      Check: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>,
+      Receipt: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>,
+      Percent: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>,
+      LogOut: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
+      Sun: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>,
+      Clock: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+      Building2: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>,
+      FilePlus: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg>,
+      Plus: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+      ChevronDown: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
+    };
+
+    const METODOS_ICONOS = {
+      efectivo: WI.Banknote, tarjeta: WI.CreditCard, yape: WI.Smartphone,
+      transferencia: WI.ArrowLeftRight, deposito: WI.FileText,
+    };
+    const COMP_ICONOS = {
+      boleta: WI.Receipt, factura: WI.FileText, comision: WI.Percent, nota_venta: WI.FilePlus,
+    };
+    const METODOS_WORKER = [
+      { id: 'efectivo', label: 'Efectivo' }, { id: 'tarjeta', label: 'Tarjeta' },
+      { id: 'yape', label: 'Yape' }, { id: 'transferencia', label: 'Transferencia' },
+      { id: 'deposito', label: 'Depósito' },
+    ];
+    const COMPROBANTES_WORKER = [
+      { id: 'boleta', label: 'Boleta' }, { id: 'factura', label: 'Factura' },
+      { id: 'comision', label: '% Comisión' }, { id: 'nota_venta', label: 'Nota de venta' },
+    ];
+
+    /* ===================== WORKER: NUEVA VENTA ===================== */
+    function WorkerNuevaVenta({ usuario, estacion, ventasWorker, setVentasWorker }) {
+      const [productoId, setProductoId] = useState('diesel');
+      const [modo, setModo] = useState('galones');
+      const [cantidad, setCantidad] = useState('');
+      const [metodo, setMetodo] = useState('efectivo');
+      const [comprobante, setComprobante] = useState('boleta');
+      const [registrando, setRegistrando] = useState(false);
+      const [registroOk, setRegistroOk] = useState(false);
+      const [carrito, setCarrito] = useState([]);
+      const [clienteNombre, setClienteNombre] = useState('');
+      const [clienteDoc, setClienteDoc] = useState('');
+      const [clienteDireccion, setClienteDireccion] = useState('');
+      const [clientePlaca, setClientePlaca] = useState('');
+
+      const producto = PRODUCTOS.find(p => p.id === productoId);
+      const num = parseFloat(cantidad) || 0;
+      const totalItem = modo === 'galones' ? num * producto.precio : num;
+      const cantidadUnidad = modo === 'galones' ? num : num / producto.precio;
+      const totalCarrito = carrito.reduce((a, item) => a + item.total, 0);
+      const totalFinal = totalCarrito + (num > 0 ? totalItem : 0);
+
+      function agregarAlCarrito() {
+        if (num <= 0) return;
+        const item = {
+          id: Date.now(),
+          productoId: producto.id,
+          nombre: producto.nombre,
+          unidad: producto.unidad,
+          precio: producto.precio,
+          color: producto.color,
+          cantidad: cantidadUnidad,
+          modo: modo,
+          total: totalItem,
+        };
+        setCarrito(prev => [...prev, item]);
+        setCantidad('');
+      }
+
+      function eliminarDelCarrito(id) {
+        setCarrito(prev => prev.filter(item => item.id !== id));
+      }
+
+      function imprimirComprobante(venta) {
+        const gravada = venta.total / 1.18;
+        const igv = venta.total - gravada;
+        const esFactura = venta.comp === 'Factura';
+        const cliente = venta.cliente || {};
+        const ticket = document.createElement('div');
+        ticket.innerHTML = `
+          <div style="font-family: 'Courier New', monospace; font-size: 11px; width: 300px; padding: 12px; color: #000; background: #fff; line-height: 1.4;">
+            <div style="text-align: center; margin-bottom: 4px;"><span style="font-size: 28px;">⛽</span></div>
+            <div style="text-align: center; font-weight: bold; font-size: 18px; letter-spacing: 1px;">GRIFOS KALA</div>
+            <div style="text-align: center; font-size: 10px; margin-top: 2px;">${EMPRESA.razonSocial}</div>
+            <div style="text-align: center; font-size: 9px;">${EMPRESA.direccion}</div>
+            <div style="text-align: center; font-size: 9px;">${EMPRESA.distrito}</div>
+            <div style="text-align: center; font-size: 9px;">TEL: ${EMPRESA.telefono}</div>
+            <div style="border-top: 2px dashed #000; margin: 8px 0;"></div>
+            <div style="text-align: center; font-weight: bold; font-size: 10px;">RUC: ${EMPRESA.ruc}</div>
+            <div style="border-top: 2px dashed #000; margin: 8px 0;"></div>
+            <div style="text-align: center; font-weight: bold; font-size: 13px;">${esFactura ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA'}</div>
+            <div style="text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 4px;">${venta.serie}</div>
+            <div style="border-top: 2px dashed #000; margin: 8px 0;"></div>
+            ${esFactura ? `
+              <div style="font-size: 10px; line-height: 1.5;">
+                <div>CLIENTE : ${cliente.nombre || 'CLIENTE VARIOS'}</div>
+                <div>RUC    : ${cliente.ruc || '—'}</div>
+                <div>DIRECCIÓN: ${cliente.direccion || '—'}</div>
+              </div>
+            ` : `
+              <div style="font-size: 10px; line-height: 1.5;">
+                <div>CLIENTE : ${cliente.nombre || 'CLIENTE VARIOS'}</div>
+                <div>DNI     : ${cliente.dni || '—'}</div>
+              </div>
+            `}
+            <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+            <div style="display: flex; justify-content: space-between; font-size: 10px;">
+              <span>F. EMISIÓN: ${venta.fecha}</span>
+              <span>HORA: ${venta.hora}</span>
+            </div>
+            <div style="font-size: 10px;">MONEDA: SOLES</div>
+            <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+            <div style="display: flex; font-weight: bold; font-size: 9px; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 3px;">
+              <span style="width: 40px;">CANT</span>
+              <span style="width: 30px;">UM</span>
+              <span style="flex: 1;">| DESCRIPCIÓN</span>
+              <span style="width: 45px; text-align: right;">P/U</span>
+              <span style="width: 55px; text-align: right;">TOTAL</span>
+            </div>
+            ${venta.items.map(item => {
+              const um = item.unidad === 'gal' ? 'GLL' : item.unidad === 'litros' ? 'LTR' : item.unidad?.toUpperCase() || 'UNI';
+              return `<div style="display: flex; font-size: 10px; padding: 2px 0;">
+                <span style="width: 40px;">${parseFloat(item.cant) || item.cant}</span>
+                <span style="width: 30px;">${um}</span>
+                <span style="flex: 1;">| ${item.nombre.toUpperCase()}</span>
+                <span style="width: 45px; text-align: right;">${item.precioUnitario?.toFixed(2) || '—'}</span>
+                <span style="width: 55px; text-align: right;">${item.total.toFixed(2)}</span>
+              </div>`;
+            }).join('')}
+            <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+            ${esFactura ? `
+              <div style="display: flex; justify-content: flex-end; font-size: 10px;"><span style="width: 120px;">GRAVADA S/</span><span style="width: 65px; text-align: right;">${gravada.toFixed(2)}</span></div>
+              <div style="display: flex; justify-content: flex-end; font-size: 10px;"><span style="width: 120px;">IGV 18.00% S/</span><span style="width: 65px; text-align: right;">${igv.toFixed(2)}</span></div>
+            ` : ''}
+            <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+            <div style="display: flex; justify-content: flex-end; font-weight: bold; font-size: 14px;">
+              <span style="width: 120px;">TOTAL S/</span>
+              <span style="width: 65px; text-align: right;">${venta.total.toFixed(2)}</span>
+            </div>
+            <div style="border-top: 2px dashed #000; margin: 6px 0;"></div>
+            <div style="font-size: 9.5px; margin-bottom: 4px;"><b>SON:</b> ${numeroALetras(venta.total)}</div>
+            <div style="font-size: 10px; margin-bottom: 3px;">PAGO CON: ${venta.metodo.toUpperCase()} MONTO: ${venta.total.toFixed(2)} VUELTO: 0</div>
+            <div style="font-size: 10px; margin-bottom: 3px;">CONDICIÓN DE PAGO: CONTADO</div>
+            ${cliente.placa ? `<div style="font-size: 10px; margin-bottom: 3px;">PLACA: ${cliente.placa}</div>` : ''}
+            <div style="font-size: 10px; margin-bottom: 8px;">ATENDIDO POR: ${(venta.trabajador || '—').toUpperCase()}</div>
+            <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+            <div style="text-align: center; font-size: 8px; color: #666; margin-bottom: 4px;">Representación impresa de la</div>
+            <div style="text-align: center; font-size: 8px; color: #666; margin-bottom: 4px;">${esFactura ? 'Factura Electrónica' : 'Boleta de Venta'}</div>
+            <div style="text-align: center; font-size: 8px; color: #666; margin-bottom: 8px;">consulte su comprobante en www.facel.pe</div>
+            <div style="text-align: center; border-top: 2px dashed #000; margin: 6px 0; padding-top: 6px;"></div>
+            <div style="text-align: center; font-size: 10px; font-weight: bold;">¡Gracias por su preferencia!</div>
+            <div style="text-align: center; font-size: 8px; color: #666; margin-top: 4px;">****************************************</div>
+          </div>
+        `;
+        const printWindow = window.open('', '_blank', 'width=320,height=700');
+        printWindow.document.write('<html><head><title>Ticket</title></head><body style="margin:0;padding:0;"></body></html>');
+        printWindow.document.body.appendChild(ticket);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
+      }
+
+      function registrarVenta() {
+        const todosItems = [
+          ...carrito,
+          ...(num > 0 ? [{
+            id: Date.now(),
+            nombre: producto.nombre,
+            unidad: producto.unidad,
+            precio: producto.precio,
+            cantidad: cantidadUnidad,
+            total: totalItem,
+          }] : []),
+        ];
+        if (todosItems.length === 0) return;
+        setRegistrando(true);
+        const now = new Date();
+        const totalFinalVenta = todosItems.reduce((a, item) => a + item.total, 0);
+        const serie = comprobante === 'factura' ? 'F001-' + String(Math.floor(Math.random()*99999)+1).padStart(5,'0') : 'B001-' + String(Math.floor(Math.random()*99999)+1).padStart(5,'0');
+        const ventaRegistrada = {
+          id: Date.now(),
+          fecha: formatFechaCorta(now),
+          hora: now.toTimeString().slice(0, 5),
+          producto: todosItems[0].nombre + (todosItems.length > 1 ? ` +${todosItems.length - 1} más` : ''),
+          cant: `${todosItems.reduce((a, it) => a + it.cantidad, 0).toFixed(2)} ${todosItems[0].unidad}`,
+          precioUnitario: todosItems[0].precio,
+          total: totalFinalVenta,
+          metodo: METODOS_WORKER.find(m => m.id === metodo)?.label || 'Efectivo',
+          comp: comprobante === 'factura' ? 'Factura' : 'Boleta',
+          serie: serie,
+          trabajador: usuario,
+          estacion: estacion,
+          cliente: {
+            nombre: clienteNombre || 'CLIENTE VARIOS',
+            ruc: comprobante === 'factura' ? clienteDoc : null,
+            dni: comprobante !== 'factura' ? clienteDoc : null,
+            direccion: clienteDireccion || null,
+            placa: clientePlaca || null,
+          },
+          items: todosItems.map(it => ({
+            nombre: it.nombre,
+            cant: `${it.cantidad.toFixed(2)} ${it.unidad}`,
+            unidad: it.unidad,
+            precioUnitario: it.precio,
+            total: it.total,
+          })),
+        };
+        setTimeout(() => {
+          setVentasWorker(prev => [ventaRegistrada, ...prev]);
+          setRegistrando(false);
+          setRegistroOk(true);
+          setCarrito([]);
+          setCantidad('');
+          setClienteNombre('');
+          setClienteDoc('');
+          setClienteDireccion('');
+          setClientePlaca('');
+          imprimirComprobante(ventaRegistrada);
+          if (comprobante === 'boleta' || comprobante === 'factura') {
+            emitirComprobanteElectronico(ventaRegistrada).then(res => {
+              if (res.ok) console.log('📄 Comprobante enviado a SUNAT exitosamente');
+              else console.warn('⚠️ No se pudo emitir electrónicamente:', res.error);
+            });
+          }
+          setTimeout(() => setRegistroOk(false), 2000);
+        }, 600);
+      }
+
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* 1. SELECCIONA EL PRODUCTO */}
+        <div>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, fontWeight: 600 }}>1. Selecciona el producto</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+            {PRODUCTOS.map(p => {
+              const sel = p.id === productoId;
+              const IconComp = { diesel: WI.Fuel, diesel4: WI.Fuel, urea: WI.Droplet, regular: WI.Gauge }[p.id] || WI.Fuel;
+              return (<button key={p.id} onClick={() => setProductoId(p.id)} type="button" style={{ padding: '16px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', border: `1.5px solid ${sel ? p.color : C.border}`, background: sel ? `${p.color}15` : C.panel, transition: 'all 0.15s' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}><IconComp size={16} color={sel ? p.color : C.muted} /></div>
+                <div style={{ fontFamily: 'Inter', fontSize: 13.5, color: sel ? C.text : C.textDim, fontWeight: sel ? 600 : 500 }}>{p.nombre}</div>
+                <div style={{ fontFamily: 'JetBrains Mono', fontSize: 17, fontWeight: 700, color: p.color, marginTop: 4 }}>S/ {p.precio.toFixed(2)}</div>
+              </button>);
+            })}
+          </div>
+        </div>
+
+        {/* 2. CANTIDAD + AGREGAR */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>2. ¿Cómo te lo piden?</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[{ id: 'galones', label: `Por ${producto.unidad}`, icon: WI.Gauge }, { id: 'soles', label: 'Por soles', icon: WI.Banknote }].map(m => (
+                <button key={m.id} onClick={() => setModo(m.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: `1px solid ${modo === m.id ? C.amber : C.border}`, background: modo === m.id ? C.amberSoft : 'transparent', color: modo === m.id ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                  <m.icon size={13} /> {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input type="number" step="0.01" min="0" placeholder={modo === 'galones' ? `Cantidad en ${producto.unidad}` : 'Monto en S/'} value={cantidad} onChange={e => setCantidad(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') agregarAlCarrito(); }} style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 18, boxSizing: 'border-box' }} />
+            <button onClick={agregarAlCarrito} disabled={num <= 0} type="button" style={{ padding: '14px 20px', borderRadius: 10, border: 'none', background: num <= 0 ? C.panelLight : C.teal, color: num <= 0 ? C.muted : C.bg, fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: num <= 0 ? 'not-allowed' : 'pointer', opacity: num <= 0 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <WI.Plus size={16} /> Agregar
+            </button>
+          </div>
+        </div>
+
+        {/* CARRITO */}
+        {carrito.length > 0 && (
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
+            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', marginBottom: 10, fontWeight: 600 }}>🛒 Carrito ({carrito.length} items)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {carrito.map(item => (
+                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: C.panel, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: 'Inter', fontSize: 12.5, color: C.text, fontWeight: 500 }}>{item.nombre}</div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>{item.cantidad.toFixed(2)} {item.unidad} × S/ {item.precio.toFixed(2)}</div>
+                  </div>
+                  <div style={{ fontFamily: 'JetBrains Mono', fontSize: 13, fontWeight: 700, color: C.amber }}>{money(item.total)}</div>
+                  <button onClick={() => eliminarDelCarrito(item.id)} type="button" style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 4 }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: C.amber }}>Subtotal carrito: {money(totalCarrito)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* 3. FORMA DE PAGO */}
+        <div>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, fontWeight: 600 }}>3. Forma de pago</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+            {METODOS_WORKER.map(m => {
+              const sel = m.id === metodo;
+              const Icon = METODOS_ICONOS[m.id];
+              return (<button key={m.id} onClick={() => setMetodo(m.id)} type="button" style={{ padding: '12px 6px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', border: `1.5px solid ${sel ? C.amber : C.border}`, background: sel ? C.amberSoft : C.panel, transition: 'all 0.15s' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}><Icon size={18} color={sel ? C.amber : C.muted} /></div>
+                <div style={{ fontFamily: 'Inter', fontSize: 11, color: sel ? C.amber : C.textDim, fontWeight: 500 }}>{m.label}</div>
+              </button>);
+            })}
+          </div>
+        </div>
+
+        {/* 4. COMPROBANTE */}
+        <div>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, fontWeight: 600 }}>4. Comprobante</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {COMPROBANTES_WORKER.map(c => {
+              const sel = c.id === comprobante;
+              const Icon = COMP_ICONOS[c.id];
+              return (<button key={c.id} onClick={() => setComprobante(c.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${sel ? C.amber : C.border}`, background: sel ? C.amberSoft : 'transparent', color: sel ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                <Icon size={13} /> {c.label}
+              </button>);
+            })}
+          </div>
+        </div>
+
+        {/* 5. DATOS DEL CLIENTE */}
+        <div>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, fontWeight: 600 }}>5. Datos del cliente</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>{comprobante === 'factura' ? 'Razón Social' : 'Nombre'}</div>
+              <input placeholder={comprobante === 'factura' ? ' Razón Social' : 'Nombre del cliente'} value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'Inter', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>{comprobante === 'factura' ? 'RUC' : 'DNI'}</div>
+              <input placeholder={comprobante === 'factura' ? 'RUC (11 dígitos)' : 'DNI (8 dígitos)'} value={clienteDoc} onChange={e => setClienteDoc(e.target.value)} maxLength={comprobante === 'factura' ? 11 : 8} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+            {comprobante === 'factura' && (
+              <div>
+                <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>Dirección</div>
+                <input placeholder="Dirección del cliente" value={clienteDireccion} onChange={e => setClienteDireccion(e.target.value)} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'Inter', fontSize: 13, boxSizing: 'border-box' }} />
+              </div>
+            )}
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>Placa (opcional)</div>
+              <input placeholder="ABC-123" value={clientePlaca} onChange={e => setClientePlaca(e.target.value.toUpperCase())} maxLength={8} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, letterSpacing: 1, boxSizing: 'border-box' }} />
+            </div>
+          </div>
+        </div>
+
+        {/* DIVIDER + TOTAL + BOTON */}
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Total a cobrar</div>
+            <div style={{ fontFamily: 'JetBrains Mono', fontSize: 30, fontWeight: 700, color: C.amber, letterSpacing: '0.02em' }}>S/ {totalFinal.toFixed(2)}</div>
+            <div style={{ fontFamily: 'Inter', fontSize: 11.5, color: C.muted, marginTop: 2 }}>{carrito.length + (num > 0 ? 1 : 0)} producto{(carrito.length + (num > 0 ? 1 : 0)) !== 1 ? 's' : ''} · {METODOS_WORKER.find(m => m.id === metodo)?.label}</div>
+          </div>
+          <button onClick={registrarVenta} disabled={(carrito.length === 0 && num <= 0) || registrando} type="button" style={{ display: 'flex', alignItems: 'center', gap: 8, background: registroOk ? C.green : (carrito.length === 0 && num <= 0) ? C.panelLight : C.amber, color: (carrito.length === 0 && num <= 0) ? C.muted : C.bg, border: 'none', borderRadius: 10, padding: '14px 28px', fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: (carrito.length === 0 && num <= 0) ? 'not-allowed' : 'pointer', opacity: (carrito.length === 0 && num <= 0) ? 0.5 : 1, transition: 'all 0.2s' }}>
+            {registrando ? '⏳ Registrando...' : registroOk ? '✅ Venta registrada e imprimir' : '🖨️ Registrar e imprimir'}
+          </button>
+        </div>
+      </div>);
+    }
+
+    /* ===================== WORKER: CIERRE DE TURNO ===================== */
+    function WorkerCierreTurno({ ventasWorker, estacion, usuario }) {
+      const isMobile = useIsMobile();
+      const [lecturas, setLecturas] = useState(() => {
+        const init = {};
+        PRODUCTOS.forEach(p => {
+          init[p.id] = [];
+          for (let i = 1; i <= 2; i++) {
+            init[p.id].push({ id: Date.now() + Math.random(), anterior: '', actual: '' });
+          }
+        });
+        return init;
+      });
+
+      function setLectura(productoId, idx, campo, valor) {
+        setLecturas(prev => ({
+          ...prev,
+          [productoId]: prev[productoId].map((r, i) => i === idx ? { ...r, [campo]: valor } : r)
+        }));
+      }
+
+      function agregarManguera(productoId) {
+        setLecturas(prev => ({
+          ...prev,
+          [productoId]: [...prev[productoId], { id: Date.now(), anterior: '', actual: '' }]
+        }));
+      }
+
+      function eliminarManguera(productoId, idx) {
+        setLecturas(prev => ({
+          ...prev,
+          [productoId]: prev[productoId].filter((_, i) => i !== idx)
+        }));
+      }
+
+      function calcularGalones(productoId) {
+        return (lecturas[productoId] || []).reduce((total, r) => {
+          const ant = parseFloat(r.anterior) || 0;
+          const act = parseFloat(r.actual) || 0;
+          return total + Math.max(0, act - ant);
+        }, 0);
+      }
+
+      function calcularMontoProducto(productoId) {
+        const p = PRODUCTOS.find(pp => pp.id === productoId);
+        return calcularGalones(productoId) * (p ? p.precio : 0);
+      }
+
+      const totalMangueras = PRODUCTOS.reduce((sum, p) => sum + calcularMontoProducto(p.id), 0);
+      const totalGalonesMangueras = PRODUCTOS.reduce((sum, p) => sum + calcularGalones(p.id), 0);
+      const totalVentas = ventasWorker.length;
+      const montoTotal = ventasWorker.reduce((a, v) => a + v.total, 0);
+      const efectivo = ventasWorker.filter(v => v.metodo === 'Efectivo').reduce((a, v) => a + v.total, 0);
+      const otro = montoTotal - efectivo;
+
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* LECTURAS DE MANGUERA */}
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: C.tealSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 15, fontWeight: 700, color: C.text }}>LECTURAS DE MANGUERA</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Kilometraje de las máquinas asignadas al turno</div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(380px, 1fr))', gap: 16, marginTop: 16 }}>
+            {PRODUCTOS.map(p => {
+              const galones = calcularGalones(p.id);
+              const monto = calcularMontoProducto(p.id);
+              return (
+                <div key={p.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color }} />
+                      <span style={{ fontFamily: 'Oswald', fontSize: 14, fontWeight: 600, color: p.color, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{p.nombre}</span>
+                    </div>
+                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: C.muted }}>S/ {p.precio.toFixed(2)} / {p.unidad}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr 70px 24px', gap: 6, marginBottom: 8 }}>
+                    <div /> 
+                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, textAlign: 'center', fontWeight: 600 }}>Anterior</div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, textAlign: 'center', fontWeight: 600 }}>Actual</div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, textAlign: 'right', fontWeight: 600 }}>Galones</div>
+                    <div /> 
+                  </div>
+                  {(lecturas[p.id] || []).map((r, idx) => {
+                    const ant = parseFloat(r.anterior) || 0;
+                    const act = parseFloat(r.actual) || 0;
+                    const gal = Math.max(0, act - ant);
+                    return (
+                      <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr 70px 24px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                        <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim, textAlign: 'center', fontWeight: 600 }}>{idx + 1}</div>
+                        <input type="number" step="0.001" min="0" placeholder="0.000" value={r.anterior} onChange={e => setLectura(p.id, idx, 'anterior', e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 8px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
+                        <input type="number" step="0.001" min="0" placeholder="0.000" value={r.actual} onChange={e => setLectura(p.id, idx, 'actual', e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 8px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
+                        <div style={{ textAlign: 'right' }}><span style={{ fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, color: gal > 0 ? p.color : C.muted }}>{gal > 0 ? gal.toFixed(2) : '0.00'}</span>{gal > 0 && <span style={{ fontFamily: 'Inter', fontSize: 9, color: C.muted, marginLeft: 2 }}>—</span>}</div>
+                        <button onClick={() => eliminarManguera(p.id, idx)} type="button" style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 2, opacity: 0.5 }} title="Eliminar manguera">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button onClick={() => agregarManguera(p.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 6, border: `1px dashed ${C.border}`, background: 'transparent', color: C.textDim, fontFamily: 'Inter', fontSize: 11, cursor: 'pointer', marginTop: 4 }}>
+                    + Agregar manguera
+                  </button>
+                  <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 12, paddingTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Total {p.nombre.toLowerCase()}: <b style={{ color: C.text }}>{galones.toFixed(2)} gal</b></span>
+                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 16, fontWeight: 700, color: p.color }}>{money(monto)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ borderTop: `2px solid ${C.border}`, marginTop: 16, paddingTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontFamily: 'Inter', fontSize: 14, color: C.muted }}>Suma de mangueras (galones → soles):</span>
+            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 22, fontWeight: 700, color: C.amber }}>{money(totalMangueras)}</span>
+          </div>
+        </div>
+
+        {/* RESUMEN DEL TURNO */}
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 16 }}>📊 Resumen del turno</div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: 12 }}>
+            <KpiCard label="Mangueras" value={money(totalMangueras)} sub={`${totalGalonesMangueras.toFixed(1)} gal`} color={C.teal} />
+            <KpiCard label="Ventas POS" value={money(montoTotal)} sub="transacciones" color={C.amber} />
+            <KpiCard label="Efectivo" value={money(efectivo)} sub="en caja" color={C.green} />
+            <KpiCard label="Otros medios" value={money(otro)} sub="transferencias/tarjetas" color={C.blue || C.teal} />
+          </div>
+        </div>
+
+        {/* DETALLE POR MÉTODO */}
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 14 }}>Detalle por método de pago</div>
+          {METODOS_WORKER.map(m => {
+            const monto = ventasWorker.filter(v => v.metodo === m.label).reduce((a, v) => a + v.total, 0);
+            const count = ventasWorker.filter(v => v.metodo === m.label).length;
+            return (<div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
+              <span style={{ fontFamily: 'Inter', fontSize: 13, color: C.textDim }}>{m.label}</span>
+              <div style={{ textAlign: 'right' }}><div style={{ fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, color: C.amber }}>{money(monto)}</div><div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>{count} venta{count !== 1 ? 's' : ''}</div></div>
+            </div>);
+          })}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0 0', marginTop: 4, borderTop: `2px solid ${C.border}` }}>
+            <span style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 700, color: C.text }}>TOTAL VENTAS POS</span>
+            <span style={{ fontFamily: 'JetBrains Mono', fontSize: 20, fontWeight: 700, color: C.amber }}>{money(montoTotal)}</span>
+          </div>
+        </div>
+
+        {/* TOTAL GENERAL */}
+        <div style={{ background: C.amberSoft, border: `1px solid ${C.amber}44`, borderRadius: 14, padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted, marginBottom: 4 }}>TOTAL GENERAL DEL TURNO</div>
+            <div style={{ fontFamily: 'JetBrains Mono', fontSize: 28, fontWeight: 700, color: C.amber }}>{money(totalMangueras + montoTotal)}</div>
+            <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginTop: 2 }}>Mangueras: {money(totalMangueras)} + POS: {money(montoTotal)}</div>
+          </div>
+          <button type="button" style={{ padding: '12px 28px', borderRadius: 10, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+            Cerrar turno
+          </button>
+        </div>
+      </div>);
+    }
+
+    /* ===================== WORKER DASHBOARD ===================== */
+    function WorkerDashboard({ usuario, estacion, onLogout, onToggleTheme, themeDark }) {
+      const [currentTime, setCurrentTime] = useState(new Date());
+      const [tab, setTab] = useState('venta');
+      const [ventasWorker, setVentasWorker] = useState([
+        { id: 1, fecha: formatFechaCorta(new Date()), hora: '08:12', producto: 'Diésel B5', cant: '20.00 gal', precioUnitario: 23.10, total: 462.00, metodo: 'Efectivo', comp: 'Boleta' },
+        { id: 2, fecha: formatFechaCorta(new Date()), hora: '08:34', producto: 'Gasolina Regular', cant: '10.00 gal', precioUnitario: 19.90, total: 199.00, metodo: 'Yape', comp: 'Boleta' },
+        { id: 3, fecha: formatFechaCorta(new Date()), hora: '09:05', producto: 'Diésel B5', cant: '40.00 gal', precioUnitario: 23.10, total: 924.00, metodo: 'Tarjeta', comp: 'Factura' },
+      ]);
+      const [metodoEditando, setMetodoEditando] = useState(null);
+      useEffect(() => { const t = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(t); }, []);
+
+      let trabajador = TRABAJADORES_INIT.find(t => t.usuario === usuario);
+      if (!trabajador) {
+        const nf = usuario.charAt(0).toUpperCase() + usuario.slice(1);
+        trabajador = { id: 999, nombre: nf, usuario, estacion: ESTACIONES[0], horario: horario({ Lun: { libre: false, ini: '06:00', fin: '14:00' }, Mar: { libre: false, ini: '06:00', fin: '14:00' }, Mié: { libre: false, ini: '06:00', fin: '14:00' }, Jue: { libre: false, ini: '06:00', fin: '14:00' }, Vie: { libre: false, ini: '06:00', fin: '14:00' }, Sáb: { libre: true }, Dom: { libre: true } }) };
+      }
+
+      const nombreMostrar = trabajador.nombre;
+      const ventasVisibles = ventasWorker.filter(v => v.metodo !== 'Efectivo');
+      const totalVentas = ventasWorker.length;
+      const montoTotal = ventasWorker.reduce((a, v) => a + v.total, 0);
+      function cambiarMetodo(id, nuevoMetodo) {
+        setVentasWorker(prev => prev.map(v => v.id === id ? { ...v, metodo: nuevoMetodo } : v));
+        setMetodoEditando(null);
+      }
+      const now = new Date();
+      const fechaLarga = now.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' });
+      const fechaFormateada = fechaLarga.charAt(0).toUpperCase() + fechaLarga.slice(1);
+
+      return (<div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column' }}>
+        {/* ===== TOP BAR ===== */}
+        <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+          <Logo />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, fontFamily: 'Inter', fontSize: 12.5, color: C.textDim }}>
+            <WI.Building2 size={14} color={C.muted} /> {estacion}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Inter', fontSize: 12.5, color: C.textDim }}>
+            <WI.Clock size={14} color={C.muted} /> {fechaFormateada}
+          </div>
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Inter', fontSize: 12.5, color: C.textDim }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green }} />
+            {nombreMostrar} · Trabajador
+          </div>
+          <button onClick={onToggleTheme} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, fontFamily: 'Inter', fontSize: 12, cursor: 'pointer' }}>
+            <WI.Sun size={14} color={C.amber} /> {themeDark ? 'Claro' : 'Oscuro'}
+          </button>
+          <button onClick={onLogout} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: 'none', border: `1px solid ${C.border}`, color: C.textDim, fontFamily: 'Inter', fontSize: 12, cursor: 'pointer' }}>
+            <WI.LogOut size={14} /> Salir
+          </button>
+        </div>
+
+        {/* ===== TABS ===== */}
+        <div style={{ borderBottom: `1px solid ${C.border}`, padding: '12px 20px', display: 'flex', gap: 8 }}>
+          {[{ id: 'venta', label: 'Nueva venta', icon: WI.FilePlus }, { id: 'cierre', label: 'Cierre de turno', icon: WI.Receipt }].map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, border: `1px solid ${tab === t.id ? C.amber : C.border}`, background: tab === t.id ? C.amberSoft : C.panel, color: tab === t.id ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              <t.icon size={14} /> {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ===== CONTENT: 2 COLUMNS ===== */}
+        <div style={{ flex: 1, padding: '20px', display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+          {/* LEFT: Main content */}
+          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 24, overflowY: 'auto' }}>
+            {tab === 'venta' ? (
+              <WorkerNuevaVenta usuario={nombreMostrar} estacion={estacion} ventasWorker={ventasWorker} setVentasWorker={setVentasWorker} />
+            ) : (
+              <WorkerCierreTurno ventasWorker={ventasWorker} estacion={estacion} usuario={nombreMostrar} />
+            )}
+          </div>
+
+          {/* RIGHT: Sidebar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Turno card */}
+            <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <WI.Clock size={15} color={C.teal} />
+                <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Turno actual · {estacion.split(' ').pop()}</span>
+              </div>
+              <div style={{ fontFamily: 'JetBrains Mono', fontSize: 32, fontWeight: 700, color: C.amber, letterSpacing: '0.02em' }}>{money(montoTotal)}</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginTop: 4 }}>{ventasVisibles.length} venta{ventasVisibles.length !== 1 ? 's' : ''} pendiente{ventasVisibles.length !== 1 ? 's' : ''} · {nombreMostrar}</div>
+            </div>
+
+            {/* Ventas recientes */}
+            <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, flex: 1, overflowY: 'auto' }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 14 }}>Ventas recientes</div>
+              {ventasVisibles.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 30 }}><div style={{ fontSize: 28, marginBottom: 8 }}>🛒</div><div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>Sin ventas pendientes</div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginTop: 4 }}>Las ventas en efectivo se registran directo</div></div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {ventasVisibles.map((v) => (
+                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: C.bg, borderRadius: 8, border: `1px solid ${C.border}`, position: 'relative' }}>
+                      <div style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: C.muted, minWidth: 38 }}>{v.hora}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontFamily: 'Inter', fontSize: 12.5, color: C.text, fontWeight: 500 }}>{v.producto}</div>
+                        <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>{v.cant}</div>
+                      </div>
+                      <div style={{ position: 'relative' }}>
+                        <button onClick={() => setMetodoEditando(metodoEditando === v.id ? null : v.id)} type="button" style={{ padding: '3px 8px', borderRadius: 5, fontSize: 10, fontWeight: 600, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, background: v.metodo === 'Yape' ? C.purple + '22' : C.tealSoft, color: v.metodo === 'Yape' ? C.purple : C.teal }}>
+                          {v.metodo} <WI.ChevronDown size={10} />
+                        </button>
+                        {metodoEditando === v.id && (
+                          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 8, padding: 4, zIndex: 50, minWidth: 120, boxShadow: `0 4px 12px ${C.bg}` }}>
+                            {METODOS_WORKER.map(m => (
+                              <button key={m.id} onClick={() => cambiarMetodo(v.id, m.label)} type="button" style={{ display: 'block', width: '100%', padding: '6px 10px', borderRadius: 5, border: 'none', background: v.metodo === m.label ? C.amberSoft : 'transparent', color: v.metodo === m.label ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 11, textAlign: 'left', cursor: 'pointer' }}>
+                                {m.label} {m.label === 'Efectivo' && <span style={{ color: C.muted, fontSize: 9 }}>(quitar de lista)</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ fontFamily: 'JetBrains Mono', fontSize: 13, fontWeight: 700, color: C.amber }}>{money(v.total)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>);
+    }
+
+    /* ===================== MAIN APP ===================== */
+    function App() {
+      const [screen, setScreen] = useState('login');
+      const [rol, setRol] = useState('trabajador');
+      const [usuario, setUsuario] = useState('');
+      const [seccion, setSeccion] = useState('resumen');
+      const [estacion, setEstacion] = useState(ESTACIONES[0]);
+      const [themeDark, setThemeDark] = useState(true);
+      function toggleTheme() { setThemeDark(prev => { const next = !prev; C = next ? DARK : LIGHT; document.body.style.background = next ? '#12161A' : '#F5F5F0'; return next; }); }
+      const [ventas, setVentas] = useState([
+        { fecha: formatFechaCorta(new Date()), hora: '08:15', producto: 'Diésel B5', cant: '45.20 gal', precioUnitario: 23.10, total: 1044.12, metodo: 'Efectivo', comp: 'Boleta', serieBoleta: 'B001-00123', serieFactura: null, ruc: null, razonSocial: null, dniCliente: '48562190', nombreCliente: 'Milagros Condori', placa: null, items: [{ producto: 'Diésel B5', cant: '45.20 gal', precioUnitario: 23.10, total: 1044.12 }], itemCount: 1, esBancarizacion: false, trabajador: 'Milagros Condori' },
+        { fecha: formatFechaCorta(new Date()), hora: '09:32', producto: 'Gasolina Regular', cant: '30.00 gal', precioUnitario: 19.90, total: 597.00, metodo: 'Yape', comp: 'Boleta', serieBoleta: 'B001-00124', serieFactura: null, ruc: null, razonSocial: null, dniCliente: '76901234', nombreCliente: 'Edwin Mamani', placa: 'ABC-123', items: [{ producto: 'Gasolina Regular', cant: '30.00 gal', precioUnitario: 19.90, total: 597.00 }], itemCount: 1, esBancarizacion: false, trabajador: 'Milagros Condori' },
+        { fecha: formatFechaCorta(new Date()), hora: '10:45', producto: 'Diésel D-B5', cant: '60.50 gal', precioUnitario: 23.10, total: 1397.55, metodo: 'Transferencia', comp: 'Factura', serieBoleta: null, serieFactura: 'F001-00012', ruc: '20456789012', razonSocial: 'TRANSPORTES DEL SUR S.A.C.', dniCliente: null, nombreCliente: null, placa: 'XYZ-789', items: [{ producto: 'Diésel D-B5', cant: '60.50 gal', precioUnitario: 23.10, total: 1397.55 }], itemCount: 1, esBancarizacion: true, trabajador: 'Edwin Mamani' },
+        { fecha: formatFechaCorta(new Date()), hora: '11:20', producto: 'Urea 32', cant: '120.00 kg', precioUnitario: 2.50, total: 300.00, metodo: 'Efectivo', comp: 'Boleta', serieBoleta: 'B001-00125', serieFactura: null, ruc: null, razonSocial: null, dniCliente: '10234567', nombreCliente: 'Carlos Huanca', placa: null, items: [{ producto: 'Urea 32', cant: '120.00 kg', precioUnitario: 2.50, total: 300.00 }], itemCount: 1, esBancarizacion: false, trabajador: 'Milagros Condori' },
+        { fecha: formatFechaCorta(new Date()), hora: '13:05', producto: 'Diésel B5', cant: '55.80 gal', precioUnitario: 23.10, total: 1288.98, metodo: 'Tarjeta', comp: 'Factura', serieBoleta: null, serieFactura: 'F001-00013', ruc: '20987654321', razonSocial: 'AGRICOLA VALLE S.A.C.', dniCliente: null, nombreCliente: null, placa: 'DEF-456', items: [{ producto: 'Diésel B5', cant: '55.80 gal', precioUnitario: 23.10, total: 1288.98 }], itemCount: 1, esBancarizacion: true, trabajador: 'Edwin Mamani' },
+      ]);
+
+      function handleLogin(rolElegido, user) {
+        setRol(rolElegido);
+        setUsuario(user);
+        setScreen(rolElegido === 'admin' ? 'admin' : 'worker');
+        if (rolElegido === 'admin') setSeccion('resumen');
+      }
+
+      if (screen === 'login') return <LoginScreen onLogin={handleLogin} />;
+      if (screen === 'worker') return (<WorkerDashboard usuario={usuario} estacion={estacion} onLogout={() => setScreen('login')} onToggleTheme={toggleTheme} themeDark={themeDark} />);
+
+      const adminTabs = [
+        { id: 'resumen', label: 'Resumen', Icon: I.LayoutDashboard },
+        { id: 'tanques', label: 'Tanques', Icon: I.Gauge },
+        { id: 'comprobantes', label: 'Comprobantes', Icon: I.FileText },
+        { id: 'trabajadores', label: 'Trabajadores', Icon: I.Users },
+        { id: 'reportes', label: 'Reportes', Icon: I.BarChart3 },
+      ];
+
+      return (<div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column' }}>
+        {/* TOP BAR */}
+        <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: '12px 20px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Logo />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <select value={estacion} onChange={e => setEstacion(e.target.value)} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 12px', color: C.text, fontFamily: 'Inter', fontSize: 12.5, cursor: 'pointer' }}>
+                {ESTACIONES.map(e => <option key={e} value={e} style={{ background: C.panel }}>{e}</option>)}
+              </select>
+              <button onClick={() => setScreen('login')} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 14px', color: C.textDim, cursor: 'pointer', fontFamily: 'Inter', fontSize: 12 }}>
+                <I.LogOut size={14} /> Salir
+              </button>
+            </div>
+          </div>
+        </div>
+        {/* TABS */}
+        <div style={{ borderBottom: `1px solid ${C.border}`, padding: '12px 20px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto' }}><TabBar tabs={adminTabs} active={seccion} onChange={setSeccion} /></div>
+        </div>
+        {/* CONTENT */}
+        <div style={{ flex: 1, padding: '22px 20px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+            {seccion === 'resumen' && <ResumenAdmin estacion={estacion} />}
+            {seccion === 'tanques' && <ControlTanquesAdmin estacion={estacion} />}
+            {seccion === 'comprobantes' && <ComprobantesAdmin estacion={estacion} ventas={ventas} setVentas={setVentas} productos={PRODUCTOS} />}
+            {seccion === 'trabajadores' && <TrabajadoresAdmin />}
+            {seccion === 'reportes' && <ReportesAdmin />}
+          </div>
+        </div>
+      </div>);
+    }
+
+    /* ===================== RENDER ===================== */
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
