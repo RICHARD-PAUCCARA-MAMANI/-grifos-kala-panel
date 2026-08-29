@@ -1837,7 +1837,7 @@
     }
 
     /* ===================== WORKER DASHBOARD ===================== */
-    function WorkerDashboard({ usuario, estacion, onLogout, onToggleTheme, themeDark, trabajadores: trabajadoresGlobal, maquinas: maquinasGlobal }) {
+    function WorkerDashboard({ usuario, estacion, onLogout, onToggleTheme, themeDark }) {
       const [currentTime, setCurrentTime] = useState(new Date());
       const [tab, setTab] = useState('venta');
       const [ventasWorker, setVentasWorker] = useState([
@@ -1846,6 +1846,8 @@
         { id: 3, fecha: formatFechaCorta(new Date()), hora: '09:05', producto: 'Diésel B5', cant: '40.00 gal', precioUnitario: 23.10, total: 924.00, metodo: 'Tarjeta', comp: 'Factura' },
       ]);
       const [metodoEditando, setMetodoEditando] = useState(null);
+      const trabajadoresGlobal = useMemo(() => { try { const s = localStorage.getItem('grifos_kala_trabajadores'); return s ? JSON.parse(s) : TRABAJADORES_INIT; } catch { return TRABAJADORES_INIT; } }, []);
+      const maquinasGlobal = useMemo(() => { try { const s = localStorage.getItem('grifos_kala_maquinas'); return s ? JSON.parse(s) : MAQUINAS_INIT; } catch { return MAQUINAS_INIT; } }, []);
       useEffect(() => { const t = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(t); }, []);
 
       let trabajador = (trabajadoresGlobal || []).find(t => t.usuario === usuario) || TRABAJADORES_INIT.find(t => t.usuario === usuario);
@@ -1855,11 +1857,11 @@
       }
 
       const nombreMostrar = trabajador.nombre;
-      const maquinasTrabajador = useMemo(() => {
+      const maquinasTrabajador = (() => {
         const ids = trabajador.maquinasAsignadas || [];
         const todas = maquinasGlobal || [];
         return ids.map(id => todas.find(m => m.id === id)).filter(Boolean);
-      }, [trabajador, maquinasGlobal]);
+      })();
       const ventasVisibles = ventasWorker.filter(v => v.metodo !== 'Efectivo');
       const totalVentas = ventasWorker.length;
       const montoTotal = ventasWorker.reduce((a, v) => a + v.total, 0);
@@ -1990,7 +1992,7 @@
       }
 
       if (screen === 'login') return <LoginScreen onLogin={handleLogin} />;
-      if (screen === 'worker') return (<WorkerDashboard usuario={usuario} estacion={estacion} onLogout={() => setScreen('login')} onToggleTheme={toggleTheme} themeDark={themeDark} trabajadores={trabajadores} maquinas={maquinas} />);
+      if (screen === 'worker') return (<WorkerDashboard usuario={usuario} estacion={estacion} onLogout={() => setScreen('login')} onToggleTheme={toggleTheme} themeDark={themeDark} />);
 
       const adminTabs = [
         { id: 'resumen', label: 'Resumen', Icon: I.LayoutDashboard },
