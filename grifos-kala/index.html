@@ -1609,8 +1609,24 @@
     }
 
     /* ===================== WORKER: CIERRE DE TURNO ===================== */
-    function WorkerCierreTurno({ ventasWorker, estacion, usuario }) {
+    function WorkerCierreTurno({ ventasWorker, estacion, usuario, trabajador, maquinas: maquinasProp }) {
       const isMobile = useIsMobile();
+      const [maquinasSeleccionadas, setMaquinasSeleccionadas] = useState([]);
+
+      const maquinasDisponibles = useMemo(() => {
+        if (maquinasProp && maquinasProp.length > 0) return maquinasProp;
+        if (trabajador && trabajador.maquinasAsignadas && trabajador.maquinasAsignadas.length > 0) {
+          return trabajador.maquinasAsignadas;
+        }
+        return [];
+      }, [maquinasProp, trabajador]);
+
+      function toggleMaquinaSeleccionada(mId) {
+        setMaquinasSeleccionadas(prev => 
+          prev.includes(mId) ? prev.filter(x => x !== mId) : [...prev, mId]
+        );
+      }
+
       const [lecturas, setLecturas] = useState(() => {
         const init = {};
         PRODUCTOS.forEach(p => {
@@ -1664,6 +1680,55 @@
       const otro = montoTotal - efectivo;
 
       return (<div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* SELECCIÓN DE MÁQUINAS */}
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: C.amberSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><path d="M15 10h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2v0a2 2 0 0 0 2-2V9l-3-3"/><path d="M3 22h12"/><path d="M7 7v5"/></svg>
+            </div>
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 15, fontWeight: 700, color: C.text }}>MÁQUINAS ASIGNADAS</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Selecciona las máquinas que usaste en tu turno</div>
+            </div>
+          </div>
+          {maquinasDisponibles.length === 0 ? (
+            <div style={{ padding: 16, background: C.bg, borderRadius: 10, textAlign: 'center', border: `1px dashed ${C.border}` }}>
+              <div style={{ fontSize: 24, marginBottom: 6 }}>⛽</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>No tienes máquinas asignadas</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginTop: 2 }}>Contacta al administrador</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {maquinasDisponibles.map(m => {
+                const sel = maquinasSeleccionadas.includes(m.id);
+                return (
+                  <button key={m.id} onClick={() => toggleMaquinaSeleccionada(m.id)} type="button" style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '12px 18px', borderRadius: 10,
+                    border: `2px solid ${sel ? C.amber : C.border}`,
+                    background: sel ? C.amberSoft : C.bg,
+                    cursor: 'pointer', transition: 'all 0.15s ease',
+                    minWidth: 180,
+                  }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: sel ? C.amber : C.green, flexShrink: 0 }} />
+                    <div style={{ flex: 1, textAlign: 'left' }}>
+                      <div style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 600, color: sel ? C.amber : C.text }}>{m.nombre}</div>
+                      <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>{m.isla}</div>
+                    </div>
+                    {sel && <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {maquinasSeleccionadas.length > 0 && (
+            <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: C.amberSoft, border: `1px solid ${C.amber}33`, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.amber, fontWeight: 600 }}>{maquinasSeleccionadas.length} máquina{maquinasSeleccionadas.length !== 1 ? 's' : ''} seleccionada{maquinasSeleccionadas.length !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+        </div>
+
         {/* LECTURAS DE MANGUERA */}
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
@@ -1772,7 +1837,7 @@
     }
 
     /* ===================== WORKER DASHBOARD ===================== */
-    function WorkerDashboard({ usuario, estacion, onLogout, onToggleTheme, themeDark }) {
+    function WorkerDashboard({ usuario, estacion, onLogout, onToggleTheme, themeDark, trabajadores: trabajadoresGlobal, maquinas: maquinasGlobal }) {
       const [currentTime, setCurrentTime] = useState(new Date());
       const [tab, setTab] = useState('venta');
       const [ventasWorker, setVentasWorker] = useState([
@@ -1783,13 +1848,18 @@
       const [metodoEditando, setMetodoEditando] = useState(null);
       useEffect(() => { const t = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(t); }, []);
 
-      let trabajador = TRABAJADORES_INIT.find(t => t.usuario === usuario);
+      let trabajador = (trabajadoresGlobal || []).find(t => t.usuario === usuario) || TRABAJADORES_INIT.find(t => t.usuario === usuario);
       if (!trabajador) {
         const nf = usuario.charAt(0).toUpperCase() + usuario.slice(1);
         trabajador = { id: 999, nombre: nf, usuario, estacion: ESTACIONES[0], horario: horario({ Lun: { libre: false, ini: '06:00', fin: '14:00' }, Mar: { libre: false, ini: '06:00', fin: '14:00' }, Mié: { libre: false, ini: '06:00', fin: '14:00' }, Jue: { libre: false, ini: '06:00', fin: '14:00' }, Vie: { libre: false, ini: '06:00', fin: '14:00' }, Sáb: { libre: true }, Dom: { libre: true } }) };
       }
 
       const nombreMostrar = trabajador.nombre;
+      const maquinasTrabajador = useMemo(() => {
+        const ids = trabajador.maquinasAsignadas || [];
+        const todas = maquinasGlobal || [];
+        return ids.map(id => todas.find(m => m.id === id)).filter(Boolean);
+      }, [trabajador, maquinasGlobal]);
       const ventasVisibles = ventasWorker.filter(v => v.metodo !== 'Efectivo');
       const totalVentas = ventasWorker.length;
       const montoTotal = ventasWorker.reduce((a, v) => a + v.total, 0);
@@ -1840,7 +1910,7 @@
             {tab === 'venta' ? (
               <WorkerNuevaVenta usuario={nombreMostrar} estacion={estacion} ventasWorker={ventasWorker} setVentasWorker={setVentasWorker} />
             ) : (
-              <WorkerCierreTurno ventasWorker={ventasWorker} estacion={estacion} usuario={nombreMostrar} />
+              <WorkerCierreTurno ventasWorker={ventasWorker} estacion={estacion} usuario={nombreMostrar} trabajador={trabajador} maquinas={maquinasTrabajador} />
             )}
           </div>
 
@@ -1920,7 +1990,7 @@
       }
 
       if (screen === 'login') return <LoginScreen onLogin={handleLogin} />;
-      if (screen === 'worker') return (<WorkerDashboard usuario={usuario} estacion={estacion} onLogout={() => setScreen('login')} onToggleTheme={toggleTheme} themeDark={themeDark} />);
+      if (screen === 'worker') return (<WorkerDashboard usuario={usuario} estacion={estacion} onLogout={() => setScreen('login')} onToggleTheme={toggleTheme} themeDark={themeDark} trabajadores={trabajadores} maquinas={maquinas} />);
 
       const adminTabs = [
         { id: 'resumen', label: 'Resumen', Icon: I.LayoutDashboard },
