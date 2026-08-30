@@ -1675,13 +1675,19 @@
       }
 
       const productosVisibles = useMemo(() => {
-        if (maquinasSeleccionadas.length === 0) return PRODUCTOS;
+        if (maquinasSeleccionadas.length === 0) return [];
         const pIds = new Set();
         maquinasSeleccionadas.forEach(mId => {
           const m = maquinasDisponibles.find(mm => mm.id === mId);
-          if (m && m.productoId) pIds.add(m.productoId);
+          if (!m) return;
+          if (m.productoId) { pIds.add(m.productoId); return; }
+          const isla = (m.isla || '').toLowerCase();
+          if (isla.includes('d2#3') || isla.includes('d2#4')) { pIds.add('diesel4'); return; }
+          if (isla.includes('d2#1')) { pIds.add('diesel'); return; }
+          if (isla.includes('regular')) { pIds.add('regular'); return; }
+          if (isla.includes('urea')) { pIds.add('urea'); return; }
         });
-        if (pIds.size === 0) return PRODUCTOS;
+        if (pIds.size === 0) return [];
         return PRODUCTOS.filter(p => pIds.has(p.id));
       }, [maquinasSeleccionadas, maquinasDisponibles]);
 
