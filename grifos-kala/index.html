@@ -378,11 +378,32 @@
     }
 
     /* ===================== ADMIN: RESUMEN ===================== */
+    const PRODUCTOS_AGRUPADOS = [
+      { id: 'diesel', nombre: 'Diésel', precio: 23.10, unidad: 'gal', color: C.amber, soft: C.amberSoft, productos: ['diesel', 'diesel4'] },
+      { id: 'regular', nombre: 'Gasolina Regular', precio: 19.90, unidad: 'gal', color: C.teal, soft: C.tealSoft, productos: ['regular'] },
+      { id: 'urea', nombre: 'Urea 32', precio: 2.50, unidad: 'litros', color: C.green, soft: C.greenSoft, productos: ['urea'] },
+    ];
     function ResumenAdmin({ estacion }) {
       const isMobile = useIsMobile();
+      const [preciosEdit, setPreciosEdit] = useState(() => {
+        try { const s = localStorage.getItem('grifos_kala_precios'); return s ? JSON.parse(s) : {}; } catch { return {}; }
+      });
+      function actualizarPrecio(grupoId, nuevoPrecio) {
+        const nuevos = { ...preciosEdit, [grupoId]: nuevoPrecio };
+        setPreciosEdit(nuevos);
+        localStorage.setItem('grifos_kala_precios', JSON.stringify(nuevos));
+        // Actualizar también en PRODUCTOS individuales
+        const grupo = PRODUCTOS_AGRUPADOS.find(g => g.id === grupoId);
+        if (grupo) {
+          grupo.productos.forEach(pid => {
+            const idx = PRODUCTOS.findIndex(p => p.id === pid);
+            if (idx >= 0) PRODUCTOS[idx] = { ...PRODUCTOS[idx], precio: nuevoPrecio };
+          });
+        }
+      }
       return (<div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
         <div><div style={{ fontFamily: "'Inter'", fontSize: 12, color: C.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Precios vigentes · {estacion}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 12 }}>{PRODUCTOS.map(p => <LedPrice key={p.id} producto={p} />)}</div></div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 12 }}>{PRODUCTOS_AGRUPADOS.map(g => <LedPrice key={g.id} grupo={g} precioEdit={preciosEdit[g.id] || g.precio} onEditar={actualizarPrecio} />)}</div></div>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
           <KpiCard label="Ventas de hoy" value={money(8214.30)} sub="Ambos grifos" color={C.amber} />
           <KpiCard label="Galones despachados" value="1,246" sub="Todos los productos" />
@@ -396,18 +417,37 @@
       </div>);
     }
 
-    function LedPrice({ producto }) {
-      const { nombre, precio, unidad, color, soft, id, tanque, maquina } = producto;
-      const IconComp = { diesel: I.Fuel, diesel4: I.Fuel, urea: I.Droplet, regular: I.Gauge }[id] || I.Fuel;
+    function LedPrice({ grupo, precioEdit, onEditar }) {
+      const { nombre, unidad, color, soft, id } = grupo;
+      const IconComp = { diesel: I.Fuel, urea: I.Droplet, regular: I.Gauge }[id] || I.Fuel;
+      const [editando, setEditando] = useState(false);
+      const [valor, setValor] = useState(precioEdit.toFixed(2));
+      function guardar() {
+        const nuevo = parseFloat(valor);
+        if (!isNaN(nuevo) && nuevo > 0) { onEditar(id, nuevo); }
+        setEditando(false);
+      }
       return (<div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: C.textDim }}>
             <div style={{ width: 28, height: 28, borderRadius: 8, background: soft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconComp size={15} color={color} /></div>
             <span style={{ fontFamily: "'Inter'", fontSize: 12.5, fontWeight: 500 }}>{nombre}</span>
           </div>
-          {tanque && <span style={{ fontFamily: 'Inter', fontSize: 9, color: C.muted, background: C.bg, padding: '2px 6px', borderRadius: 4, border: `1px solid ${C.border}` }}>{tanque} · M{maquina}</span>}
+          <button onClick={() => { setEditando(!editando); setValor(precioEdit.toFixed(2)); }} type="button" style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            <span style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>{editando ? 'Cancelar' : 'Editar'}</span>
+          </button>
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono'", fontWeight: 700, fontSize: 26, color, letterSpacing: '0.02em' }}>S/ {precio.toFixed(2)}<span style={{ fontFamily: "'Inter'", fontWeight: 500, fontSize: 11, color: C.muted, marginLeft: 6 }}>/ {unidad}</span></div>
+        {editando ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontFamily: "'JetBrains Mono'", fontWeight: 700, fontSize: 22, color }}>S/</span>
+            <input type="number" step="0.01" min="0" value={valor} onChange={e => setValor(e.target.value)} onKeyDown={e => e.key === 'Enter' && guardar()} autoFocus style={{ width: 100, background: C.bg, border: `2px solid ${C.amber}`, borderRadius: 8, padding: '6px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 18, fontWeight: 700 }} />
+            <span style={{ fontFamily: "'Inter'", fontWeight: 500, fontSize: 11, color: C.muted }}>/ {unidad}</span>
+            <button onClick={guardar} type="button" style={{ background: C.amber, color: C.bg, border: 'none', borderRadius: 6, padding: '6px 12px', fontFamily: 'Inter', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Guardar</button>
+          </div>
+        ) : (
+          <div style={{ fontFamily: "'JetBrains Mono'", fontWeight: 700, fontSize: 26, color, letterSpacing: '0.02em' }}>S/ {precioEdit.toFixed(2)}<span style={{ fontFamily: "'Inter'", fontWeight: 500, fontSize: 11, color: C.muted, marginLeft: 6 }}>/ {unidad}</span></div>
+        )}
       </div>);
     }
 
