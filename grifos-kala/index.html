@@ -1742,7 +1742,14 @@
           )}
         </div>
 
-        {/* LECTURAS DE MANGUERA */}
+        {/* LECTURAS DE MANGUERA - solo se muestra si hay máquinas seleccionadas */}
+        {maquinasSeleccionadas.length === 0 ? (
+        <div style={{ background: C.panel, border: `1px dashed ${C.border}`, borderRadius: 14, padding: 30, textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>⛽</div>
+          <div style={{ fontFamily: 'Inter', fontSize: 14, color: C.muted, fontWeight: 600 }}>Selecciona las máquinas que usaste en tu turno</div>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginTop: 4 }}>Las lecturas de manguera aparecerán aquí</div>
+        </div>
+        ) : (
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: C.tealSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1799,6 +1806,7 @@
             <span style={{ fontFamily: 'JetBrains Mono', fontSize: 22, fontWeight: 700, color: C.amber }}>{money(totalMangueras)}</span>
           </div>
         </div>
+        )}
 
         {/* RESUMEN DEL TURNO */}
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
