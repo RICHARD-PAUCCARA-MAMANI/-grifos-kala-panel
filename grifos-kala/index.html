@@ -1854,17 +1854,6 @@
         </div>
         )}
 
-        {/* RESUMEN DEL TURNO */}
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
-          <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 16 }}>📊 Resumen del turno</div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: 12 }}>
-            <KpiCard label="Mangueras" value={money(totalMangueras)} sub={`${totalGalonesMangueras.toFixed(1)} gal`} color={C.teal} />
-            <KpiCard label="Ventas POS" value={money(montoTotal)} sub="transacciones" color={C.amber} />
-            <KpiCard label="Efectivo" value={money(efectivo)} sub="en caja" color={C.green} />
-            <KpiCard label="Otros medios" value={money(otro)} sub="transferencias/tarjetas" color={C.blue || C.teal} />
-          </div>
-        </div>
-
         {/* DETALLE POR MÉTODO */}
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
           <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 14 }}>Detalle por método de pago</div>
