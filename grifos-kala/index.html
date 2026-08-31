@@ -1436,6 +1436,129 @@
         { id: 'deposito', label: 'Depósito', color: C.green },
       ];
 
+      function imprimirCierreTurno() {
+        const w = window.open('', '_blank', 'width=800,height=900');
+        const now = new Date();
+        const fecha = now.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+        const nom = trabajador ? trabajador.nombre : usuario;
+
+        // Build product rows
+        let productRows = '';
+        productosVisibles.forEach(p => {
+          const galones = calcularGalones(p.id);
+          const monto = calcularMontoProducto(p.id);
+          const lecturasProd = lecturas[p.id] || [];
+          lecturasProd.forEach((r, idx) => {
+            const ant = parseFloat(r.anterior) || 0;
+            const act = parseFloat(r.actual) || 0;
+            const gal = Math.max(0, act - ant);
+            productRows += `<tr><td style='padding:3px 6px;font-weight:600;color:#555' rowspan='${idx === 0 ? lecturasProd.length : 0}'>${idx === 0 ? p.nombre : ''}</td><td style='padding:3px 8px;font-family:monospace;text-align:right'>${ant.toFixed(3)}</td><td style='padding:3px 8px;font-family:monospace;text-align:right'>${act.toFixed(3)}</td><td style='padding:3px 8px;font-family:monospace;text-align:right;font-weight:700'>${gal.toFixed(2)}</td></tr>`;
+          });
+          if (lecturasProd.length > 0) {
+            productRows += `<tr style='background:#f5f5f0'><td colspan='3' style='padding:4px 8px;text-align:right;font-weight:700'>Total ${p.nombre}</td><td style='padding:4px 8px;text-align:right;font-family:monospace;font-weight:700;color:#C4841D'>${galones.toFixed(2)} ${p.unidad}</td></tr>`;
+            productRows += `<tr><td colspan='3' style='padding:2px 8px;text-align:right;color:#888'>${galones.toFixed(2)} × S/ ${p.precio.toFixed(2)}</td><td style='padding:2px 8px;text-align:right;font-family:monospace;font-weight:700;color:#C4841D'>S/ ${monto.toFixed(2)}</td></tr>`;
+          }
+        });
+
+        // Build virtual sales rows
+        let virtualRows = '';
+        ventasVirtuales.forEach(v => {
+          virtualRows += `<tr><td style='padding:3px 8px'>${v.producto}</td><td style='padding:3px 8px;text-align:right'>${v.cant}</td><td style='padding:3px 8px;text-align:center'><span style='background:#7B2D8E22;color:#7B2D8E;padding:1px 6px;border-radius:4px;font-size:11px'>${v.metodo}</span></td><td style='padding:3px 8px;text-align:right;font-family:monospace;font-weight:600'>S/ ${v.total.toFixed(2)}</td></tr>`;
+        });
+
+        // Build gastos rows
+        let gastosRows = '';
+        gastos.forEach(g => {
+          if (g.monto && parseFloat(g.monto) > 0) {
+            gastosRows += `<tr><td style='padding:3px 8px'>${g.concepto}</td><td style='padding:3px 8px;text-align:right;font-family:monospace;font-weight:600;color:#C0392B'>- S/ ${parseFloat(g.monto).toFixed(2)}</td></tr>`;
+          }
+        });
+
+        // Build varillado rows
+        let varilladoRows = '';
+        productosVisibles.forEach(p => {
+          if (varillado[p.id]) {
+            varilladoRows += `<tr><td style='padding:3px 8px'>${p.nombre}</td><td style='padding:3px 8px;text-align:right;font-family:monospace'>${varillado[p.id]} cm</td></tr>`;
+          }
+        });
+
+        w.document.write(`
+<!DOCTYPE html>
+<html><head><meta charset='utf-8'><title>Cierre de Turno - ${nom}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #1a1a1a; background: #fff; }
+  .header { text-align: center; border-bottom: 3px double #C4841D; padding-bottom: 16px; margin-bottom: 20px; }
+  .header h1 { font-size: 22px; color: #C4841D; letter-spacing: 2px; text-transform: uppercase; }
+  .header .sub { font-size: 13px; color: #888; margin-top: 4px; }
+  .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; color: #555; }
+  .meta span { font-weight: 600; }
+  h2 { font-size: 15px; color: #C4841D; margin: 18px 0 8px; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 13px; }
+  th { background: #f5f5f0; padding: 6px 8px; text-align: left; font-weight: 700; border-bottom: 2px solid #ddd; }
+  td { border-bottom: 1px solid #eee; }
+  .total-row { background: #f5f5f0; font-weight: 700; }
+  .total-row td { border-top: 2px solid #C4841D; border-bottom: 2px solid #C4841D; padding: 8px; }
+  .caja { background: #fdf8ed; border: 2px solid #C4841D; border-radius: 10px; padding: 16px; margin-top: 20px; }
+  .caja h2 { border: none; margin-top: 0; }
+  .caja .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 10px 0; }
+  .caja .box { background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; text-align: center; }
+  .caja .box .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .caja .box .value { font-size: 20px; font-weight: 700; }
+  .caja .final { text-align: center; margin-top: 12px; padding-top: 12px; border-top: 2px solid #C4841D; }
+  .caja .final .big { font-size: 28px; font-weight: 700; color: #C4841D; }
+  .footer { text-align: center; margin-top: 24px; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 10px; }
+  @media print { body { padding: 15px; } }
+</style></head><body>
+<div class='header'>
+  <h1>⛽ Grifos Kala</h1>
+  <div class='sub'>Reporte de Cierre de Turno</div>
+</div>
+<div class='meta'>
+  <div>Fecha: <span>${fecha}</span></div>
+  <div>Trabajador: <span>${nom}</span></div>
+  <div>Estación: <span>${estacion}</span></div>
+  <div>Hora: <span>${hora}</span></div>
+</div>
+
+<h2>📋 Lecturas de Manguera</h2>
+${productosVisibles.length > 0 ? `<table>
+  <thead><tr><th>Producto</th><th style='text-align:right'>Anterior</th><th style='text-align:right'>Actual</th><th style='text-align:right'>Galones</th></tr></thead>
+  <tbody>${productRows}</tbody>
+</table>` : '<p style="color:#888;font-size:13px">Sin lecturas de manguera</p>'}
+
+<h2>💳 Ventas Virtuales</h2>
+${ventasVirtuales.length > 0 ? `<table>
+  <thead><tr><th>Producto</th><th style='text-align:right'>Cantidad</th><th style='text-align:center'>Método</th><th style='text-align:right'>Total</th></tr></thead>
+  <tbody>${virtualRows}
+  <tr class='total-row'><td colspan='3' style='text-align:right'>Total ventas virtuales</td><td style='text-align:right;font-family:monospace;color:#2E75B6'>S/ ${totalVentasVirtuales.toFixed(2)}</td></tr>
+  </tbody>
+</table>` : '<p style="color:#888;font-size:13px">Sin ventas virtuales</p>'}
+
+${varilladoRows ? `<h2>📏 Varillado</h2><table><thead><tr><th>Tanque</th><th style='text-align:right'>Medición</th></tr></thead><tbody>${varilladoRows}</tbody></table>` : ''}
+
+${gastosRows ? `<h2>💰 Gastos de Turno</h2><table><thead><tr><th>Concepto</th><th style='text-align:right'>Monto</th></tr></thead><tbody>${gastosRows}<tr class='total-row'><td style='text-align:right'>Total gastos</td><td style='text-align:right;font-family:monospace;color:#C0392B'>- S/ ${totalGastos.toFixed(2)}</td></tr></tbody></table>` : ''}
+
+<div class='caja'>
+  <h2 style='color:#C4841D'>💵 CAJA — Efectivo del Turno</h2>
+  <div class='grid'>
+    <div class='box'><div class='label'>MANGUERAS</div><div class='value' style='color:#C4841D'>S/ ${totalMangueras.toFixed(2)}</div></div>
+    <div class='box'><div class='label'>- VENTAS VIRTUALES</div><div class='value' style='color:#2E75B6'>- S/ ${totalVentasVirtuales.toFixed(2)}</div></div>
+    <div class='box'><div class='label'>- GASTOS</div><div class='value' style='color:#C0392B'>- S/ ${totalGastos.toFixed(2)}</div></div>
+  </div>
+  <div class='final'>
+    <div style='font-size:13px;color:#888;margin-bottom:4px'>EFECTIVO QUE DEBE TENER EL TRABAJADOR</div>
+    <div class='big'>S/ ${efectivoFijo.toFixed(2)}</div>
+  </div>
+</div>
+
+<div class='footer'>Grifos Kala S.A.C. — RUC: 20612345679 — Generado el ${fecha} a las ${hora}</div>
+</body></html>`);
+        w.document.close();
+        setTimeout(() => { w.print(); }, 600);
+      }
+
       return (<div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ===== HEADER: FECHA + TRABAJADOR ===== */}
@@ -1674,9 +1797,14 @@
               <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted, marginBottom: 2 }}>EFECTIVO QUE DEBE TENER EL TRABAJADOR</div>
               <div style={{ fontFamily: 'JetBrains Mono', fontSize: 30, fontWeight: 700, color: efectivoFijo >= 0 ? C.green : C.red }}>{money(efectivoFijo)}</div>
             </div>
-            <button type="button" style={{ padding: '14px 32px', borderRadius: 10, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <WI.FileText size={16} /> Cerrar turno
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={imprimirCierreTurno} type="button" style={{ padding: '14px 24px', borderRadius: 10, background: 'none', border: `2px solid ${C.amber}`, color: C.amber, fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                🖨️ Imprimir cierre
+              </button>
+              <button type="button" style={{ padding: '14px 32px', borderRadius: 10, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <WI.FileText size={16} /> Cerrar turno
+              </button>
+            </div>
           </div>
         </div>
 
