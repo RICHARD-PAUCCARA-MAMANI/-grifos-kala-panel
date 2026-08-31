@@ -1663,6 +1663,755 @@
       }, [maquinasProp, trabajador, estacion]);
 
       function toggleMaquinaSeleccionada(mId) {
+        setMaquinasSeleccionadas(prev =>
+          prev.includes(mId) ? prev.filter(x => x !== mId) : [...prev, mId]
+        );
+      }
+
+      // Lecturas de manguera
+      const [lecturas, setLecturas] = useState(() => {
+        const init = {};
+        PRODUCTOS.forEach(p => {
+          init[p.id] = [];
+          const numMangueras = p.mangueras || 2;
+          for (let i = 0; i < numMangueras; i++) {
+            init[p.id].push({ id: Date.now() + Math.random(), anterior: '', actual: '' });
+          }
+        });
+        return init;
+      });
+
+      function setLectura(productoId, idx, campo, valor) {
+        setLecturas(prev => ({
+          ...prev,
+          [productoId]: prev[productoId].map((r, i) => i === idx ? { ...r, [campo]: valor } : r)
+        }));
+      }
+
+      function calcularGalones(productoId) {
+        return (lecturas[productoId] || []).reduce((total, r) => {
+          const ant = parseFloat(r.anterior) || 0;
+          const act = parseFloat(r.actual) || 0;
+          return total + Math.max(0, act - ant);
+        }, 0);
+      }
+
+      function calcularMontoProducto(productoId) {
+        const p = PRODUCTOS.find(pp => pp.id === productoId);
+        return calcularGalones(productoId) * (p ? p.precio : 0);
+      }
+
+      const productosVisibles = useMemo(() => {
+        if (maquinasSeleccionadas.length === 0) return [];
+        const pIds = new Set();
+        maquinasSeleccionadas.forEach(mId => {
+          const m = maquinasDisponibles.find(mm => mm.id === mId);
+          if (!m) return;
+          if (m.productoId) { pIds.add(m.productoId); return; }
+          const isla = (m.isla || '').toLowerCase();
+          if (isla.includes('d2#3') || isla.includes('d2#4')) { pIds.add('diesel4'); return; }
+          if (isla.includes('d2#1')) { pIds.add('diesel'); return; }
+          if (isla.includes('regular')) { pIds.add('regular'); return; }
+          if (isla.includes('urea')) { pIds.add('urea'); return; }
+        });
+        if (pIds.size === 0) return [];
+        return PRODUCTOS.filter(p => pIds.has(p.id));
+      }, [maquinasSeleccionadas, maquinasDisponibles]);
+
+      const totalMangueras = productosVisibles.reduce((sum, p) => sum + calcularMontoProducto(p.id), 0);
+      const totalGalonesMangueras = productosVisibles.reduce((sum, p) => sum + calcularGalones(p.id), 0);
+
+      // Ventas virtuales (no efectivo)
+      const [ventasVirtuales, setVentasVirtuales] = useState(() =>
+        ventasWorker.filter(v => v.metodo !== 'Efectivo').map(v => ({ ...v }))
+      );
+      const [metodoEditando, setMetodoEditando] = useState(null);
+
+      function cambiarMetodoVenta(id, nuevoMetodo) {
+        if (nuevoMetodo === 'Efectivo') {
+          setVentasVirtuales(prev => prev.filter(v => v.id !== id));
+        } else {
+          setVentasVirtuales(prev => prev.map(v => v.id === id ? { ...v, metodo: nuevoMetodo } : v));
+        }
+        setMetodoEditando(null);
+      }
+
+      // Varillado (medición de tanques en cm)
+      const [varillado, setVarillado] = useState(() => {
+        const init = {};
+        PRODUCTOS.forEach(p => { init[p.id] = ''; });
+        return init;
+      });
+
+      // Gastos de turno
+      const [gastos, setGastos] = useState([
+        { id: 1, concepto: 'Consumo grifo BFM-914', monto: '' },
+        { id: 2, concepto: 'Viáticos y Peajes BFM-96Y', monto: '' },
+        { id: 3, concepto: 'Pago externo', monto: '' },
+      ]);
+      const [nuevoGastoConcepto, setNuevoGastoConcepto] = useState('');
+      const [nuevoGastoMonto, setNuevoGastoMonto] = useState('');
+
+      function agregarGasto() {
+        if (!nuevoGastoConcepto.trim() || !nuevoGastoMonto) return;
+        setGastos(prev => [...prev, { id: Date.now(), concepto: nuevoGastoConcepto.trim(), monto: nuevoGastoMonto }]);
+        setNuevoGastoConcepto('');
+        setNuevoGastoMonto('');
+      }
+
+      function eliminarGasto(id) {
+        setGastos(prev => prev.filter(g => g.id !== id));
+      }
+
+      function actualizarGasto(id, campo, valor) {
+        setGastos(prev => prev.map(g => g.id === id ? { ...g, [campo]: valor } : g));
+      }
+
+      const totalGastos = gastos.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
+      const totalVentasVirtuales = ventasVirtuales.reduce((a, v) => a + v.total, 0);
+      const efectivoFijo = totalMangueras - totalVentasVirtuales - totalGastos;
+
+      const now = new Date();
+      const fechaInicio = formatFechaCorta(now);
+      const nombreTrabajador = trabajador ? trabajador.nombre : usuario;
+
+      const METODOS_CIERRE = [
+        { id: 'yape', label: 'Yape', color: '#7B2D8E' },
+        { id: 'transferencia', label: 'Transferencia', color: C.blue },
+        { id: 'tarjeta', label: 'Tarjeta', color: C.teal },
+        { id: 'deposito', label: 'Depósito', color: C.green },
+      ];
+
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* ===== HEADER: FECHA + TRABAJADOR ===== */}
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: C.amberSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <WI.Receipt size={18} color={C.amber} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'Oswald', fontSize: 16, fontWeight: 700, color: C.text, textTransform: 'uppercase', letterSpacing: '0.03em' }}>CIERRE DE TURNO</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Genera el reporte de cierre de tu turno</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ fontFamily: 'JetBrains Mono', fontSize: 14, color: C.amber, fontWeight: 600, background: C.amberSoft, padding: '6px 14px', borderRadius: 8, border: `1px solid ${C.amber}33` }}>{fechaInicio}</div>
+            <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.textDim, fontWeight: 600 }}>{nombreTrabajador}</div>
+          </div>
+        </div>
+
+        {/* ===== SELECCIÓN DE MÁQUINAS ===== */}
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 12 }}>⛽ Selecciona las máquinas que usaste</div>
+          {maquinasDisponibles.length === 0 ? (
+            <div style={{ padding: 16, background: C.bg, borderRadius: 10, textAlign: 'center', border: `1px dashed ${C.border}` }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>No tienes máquinas asignadas</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {maquinasDisponibles.map(m => {
+                const sel = maquinasSeleccionadas.includes(m.id);
+                return (
+                  <button key={m.id} onClick={() => toggleMaquinaSeleccionada(m.id)} type="button" style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 16px', borderRadius: 10,
+                    border: `2px solid ${sel ? C.amber : C.border}`,
+                    background: sel ? C.amberSoft : C.bg,
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: sel ? C.amber : C.green }} />
+                    <div>
+                      <div style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 600, color: sel ? C.amber : C.text }}>{m.nombre}</div>
+                      <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>{m.isla}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ===== LECTURAS DE MANGUERA ===== */}
+        {maquinasSeleccionadas.length === 0 ? (
+          <div style={{ background: C.panel, border: `1px dashed ${C.border}`, borderRadius: 14, padding: 30, textAlign: 'center' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>⛽</div>
+            <div style={{ fontFamily: 'Inter', fontSize: 14, color: C.muted, fontWeight: 600 }}>Selecciona las máquinas que usaste en tu turno</div>
+            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginTop: 4 }}>Las lecturas de manguera aparecerán aquí</div>
+          </div>
+        ) : (
+          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+            <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 16 }}>📋 LECTURAS DE MANGUERA</div>
+            {productosVisibles.map(p => {
+              const galones = calcularGalones(p.id);
+              const monto = calcularMontoProducto(p.id);
+              return (
+                <div key={p.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color }} />
+                      <span style={{ fontFamily: 'Oswald', fontSize: 14, fontWeight: 600, color: p.color, textTransform: 'uppercase' }}>{p.nombre}</span>
+                    </div>
+                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: C.muted }}>S/ {p.precio.toFixed(2)} / {p.unidad}</span>
+                  </div>
+                  {/* Header */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr 80px', gap: 6, marginBottom: 6 }}>
+                    <div />
+                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, textAlign: 'center', fontWeight: 600 }}>Anterior</div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, textAlign: 'center', fontWeight: 600 }}>Actual</div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, textAlign: 'right', fontWeight: 600 }}>Galones</div>
+                  </div>
+                  {(lecturas[p.id] || []).map((r, idx) => {
+                    const ant = parseFloat(r.anterior) || 0;
+                    const act = parseFloat(r.actual) || 0;
+                    const gal = Math.max(0, act - ant);
+                    return (
+                      <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr 80px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                        <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim, textAlign: 'center', fontWeight: 600 }}>{idx + 1}</div>
+                        <input type="number" step="0.001" min="0" placeholder="0.000" value={r.anterior} onChange={e => setLectura(p.id, idx, 'anterior', e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 8px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
+                        <input type="number" step="0.001" min="0" placeholder="0.000" value={r.actual} onChange={e => setLectura(p.id, idx, 'actual', e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 8px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
+                        <div style={{ textAlign: 'right' }}><span style={{ fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, color: gal > 0 ? p.color : C.muted }}>{gal > 0 ? gal.toFixed(2) : '0.00'}</span></div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 10, paddingTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Total {p.nombre.toLowerCase()}: <b style={{ color: C.text }}>{galones.toFixed(2)} {p.unidad}</b></span>
+                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 16, fontWeight: 700, color: p.color }}>{money(monto)}</span>
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ borderTop: `2px solid ${C.border}`, marginTop: 8, paddingTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>Suma de mangueras:</span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 20, fontWeight: 700, color: C.amber }}>{money(totalMangueras)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* ===== VENTAS VIRTUALES (Yape, Transferencia, Tarjeta, Depósito) ===== */}
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 700, color: C.text }}>💳 Ventas virtuales</div>
+            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Cambia el método de pago. Si cambias a Efectivo, se quita de la lista.</div>
+          </div>
+          {ventasVirtuales.length === 0 ? (
+            <div style={{ padding: 16, background: C.bg, borderRadius: 10, textAlign: 'center', border: `1px dashed ${C.border}` }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>No hay ventas virtuales pendientes</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {ventasVirtuales.map(v => {
+                const metodoInfo = METODOS_CIERRE.find(m => m.label === v.metodo) || { color: C.muted };
+                const editando = metodoEditando === v.id;
+                return (
+                  <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.bg, borderRadius: 10, border: `1px solid ${C.border}` }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.text, fontWeight: 500 }}>{v.producto}</div>
+                      <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>{v.cant} · {v.hora}</div>
+                    </div>
+                    <div style={{ fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, color: C.amber }}>{money(v.total)}</div>
+                    {/* Botón de método de pago */}
+                    <div style={{ position: 'relative' }}>
+                      <button onClick={() => setMetodoEditando(editando ? null : v.id)} type="button" style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        padding: '5px 10px', borderRadius: 6,
+                        background: metodoInfo.color + '22', border: `1px solid ${metodoInfo.color}44`,
+                        color: metodoInfo.color, fontFamily: 'Inter', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      }}>
+                        {v.metodo} <WI.ChevronDown size={12} />
+                      </button>
+                      {editando && (
+                        <div style={{ position: 'absolute', top: '110%', right: 0, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 8, padding: 6, zIndex: 50, minWidth: 150, boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                          {METODOS_CIERRE.map(m => (
+                            <button key={m.id} onClick={() => cambiarMetodoVenta(v.id, m.label)} type="button" style={{
+                              display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px', borderRadius: 6,
+                              background: m.label === v.metodo ? C.amberSoft : 'transparent', border: 'none', cursor: 'pointer',
+                              color: m.label === v.metodo ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 500, textAlign: 'left',
+                            }}>
+                              <div style={{ width: 8, height: 8, borderRadius: '50%', background: m.color }} /> {m.label}
+                            </button>
+                          ))}
+                          <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 4, paddingTop: 4 }}>
+                            <button onClick={() => cambiarMetodoVenta(v.id, 'Efectivo')} type="button" style={{
+                              display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px', borderRadius: 6,
+                              background: C.greenSoft, border: 'none', cursor: 'pointer',
+                              color: C.green, fontFamily: 'Inter', fontSize: 12, fontWeight: 700, textAlign: 'left',
+                            }}>
+                              <WI.Banknote size={12} /> Efectivo (quitar de lista)
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ borderTop: `2px solid ${C.border}`, marginTop: 8, paddingTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>Total ventas virtuales:</span>
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 18, fontWeight: 700, color: C.blue }}>{money(totalVentasVirtuales)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ===== VARILLADO (Medición de tanques en cm) ===== */}
+        {maquinasSeleccionadas.length > 0 && (
+          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+            <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 14 }}>📏 Varillado (cm)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+              {productosVisibles.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bg, borderRadius: 8, padding: '8px 12px', border: `1px solid ${C.border}` }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
+                  <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim, minWidth: 60 }}>{p.nombre.split(' ')[0]}:</span>
+                  <input type="number" step="1" min="0" placeholder="cm" value={varillado[p.id] || ''} onChange={e => setVarillado(prev => ({ ...prev, [p.id]: e.target.value }))} style={{ flex: 1, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 8px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
+                  <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>cm</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== GASTOS DE TURNO ===== */}
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 14 }}>💰 Gastos de turno</div>
+          <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 12 }}>Descuenta consumo de cisterna, viáticos, pagos externos, etc.</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {gastos.map(g => (
+              <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bg, borderRadius: 8, padding: '8px 12px', border: `1px solid ${C.border}` }}>
+                <input type="text" placeholder="Concepto" value={g.concepto} onChange={e => actualizarGasto(g.id, 'concepto', e.target.value)} style={{ flex: 1, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />
+                <input type="number" step="0.01" min="0" placeholder="S/ 0.00" value={g.monto} onChange={e => actualizarGasto(g.id, 'monto', e.target.value)} style={{ width: 110, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, textAlign: 'right', boxSizing: 'border-box' }} />
+                <button onClick={() => eliminarGasto(g.id)} type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.red, padding: 4 }}><WI.Trash2 size={14} /></button>
+              </div>
+            ))}
+            {/* Agregar gasto */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="text" placeholder="Nuevo gasto..." value={nuevoGastoConcepto} onChange={e => setNuevoGastoConcepto(e.target.value)} onKeyDown={e => e.key === 'Enter' && agregarGasto()} style={{ flex: 1, background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 8, padding: '8px 12px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />
+              <input type="number" step="0.01" min="0" placeholder="S/" value={nuevoGastoMonto} onChange={e => setNuevoGastoMonto(e.target.value)} onKeyDown={e => e.key === 'Enter' && agregarGasto()} style={{ width: 110, background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 8, padding: '8px 12px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, textAlign: 'right', boxSizing: 'border-box' }} />
+              <button onClick={agregarGasto} type="button" style={{ padding: '8px 12px', borderRadius: 8, background: C.amberSoft, border: `1px solid ${C.amber}44`, color: C.amber, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}><WI.Plus size={14} /></button>
+            </div>
+          </div>
+          {totalGastos > 0 && (
+            <div style={{ borderTop: `2px solid ${C.border}`, marginTop: 12, paddingTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>Total gastos:</span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 18, fontWeight: 700, color: C.red }}>- {money(totalGastos)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* ===== CAJA: TOTAL EFECTIVO ===== */}
+        <div style={{ background: C.amberSoft, border: `2px solid ${C.amber}`, borderRadius: 14, padding: 20 }}>
+          <div style={{ fontFamily: 'Oswald', fontSize: 16, fontWeight: 700, color: C.amber, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 14 }}>💵 CAJA — Efectivo total del turno</div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 12 }}>
+            <div style={{ background: C.bg, borderRadius: 10, padding: '14px 16px', border: `1px solid ${C.border}` }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 6 }}>MANGUERAS (galones vendidos)</div>
+              <div style={{ fontFamily: 'JetBrains Mono', fontSize: 22, fontWeight: 700, color: C.amber }}>{money(totalMangueras)}</div>
+            </div>
+            <div style={{ background: C.bg, borderRadius: 10, padding: '14px 16px', border: `1px solid ${C.border}` }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 6 }}>- VENTAS VIRTUALES</div>
+              <div style={{ fontFamily: 'JetBrains Mono', fontSize: 22, fontWeight: 700, color: C.blue }}>- {money(totalVentasVirtuales)}</div>
+            </div>
+            <div style={{ background: C.bg, borderRadius: 10, padding: '14px 16px', border: `1px solid ${C.border}` }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 6 }}>- GASTOS</div>
+              <div style={{ fontFamily: 'JetBrains Mono', fontSize: 22, fontWeight: 700, color: C.red }}>- {money(totalGastos)}</div>
+            </div>
+          </div>
+          <div style={{ borderTop: `2px solid ${C.amber}`, marginTop: 16, paddingTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted, marginBottom: 2 }}>EFECTIVO QUE DEBE TENER EL TRABAJADOR</div>
+              <div style={{ fontFamily: 'JetBrains Mono', fontSize: 30, fontWeight: 700, color: efectivoFijo >= 0 ? C.green : C.red }}>{money(efectivoFijo)}</div>
+            </div>
+            <button type="button" style={{ padding: '14px 32px', borderRadius: 10, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <WI.FileText size={16} /> Cerrar turno
+            </button>
+          </div>
+        </div>
+
+      </div>);
+    }
+
+    /* ===================== WORKER DASHBOARD ===================== */
+    /* ===================== WORKER: ICONOS PEQUEÑOS ===================== */
+    const WI = {
+      Fuel: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><path d="M15 10h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2v0a2 2 0 0 0 2-2V9l-3-3"/><path d="M3 22h12"/><path d="M7 7v5"/></svg>,
+      Droplet: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>,
+      Gauge: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>,
+      CreditCard: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>,
+      Banknote: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>,
+      Smartphone: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>,
+      ArrowLeftRight: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>,
+      FileText: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>,
+      Check: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>,
+      Receipt: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>,
+      Percent: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><line x1="19" x2="5" y1="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>,
+      LogOut: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>,
+      Sun: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>,
+      Clock: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+      Building2: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>,
+      FilePlus: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg>,
+      Plus: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+      ChevronDown: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
+    };
+
+    const METODOS_ICONOS = {
+      efectivo: WI.Banknote, tarjeta: WI.CreditCard, yape: WI.Smartphone,
+      transferencia: WI.ArrowLeftRight, deposito: WI.FileText,
+    };
+    const COMP_ICONOS = {
+      boleta: WI.Receipt, factura: WI.FileText, comision: WI.Percent, nota_venta: WI.FilePlus,
+    };
+    const METODOS_WORKER = [
+      { id: 'efectivo', label: 'Efectivo' }, { id: 'tarjeta', label: 'Tarjeta' },
+      { id: 'yape', label: 'Yape' }, { id: 'transferencia', label: 'Transferencia' },
+      { id: 'deposito', label: 'Depósito' },
+    ];
+    const COMPROBANTES_WORKER = [
+      { id: 'boleta', label: 'Boleta' }, { id: 'factura', label: 'Factura' },
+      { id: 'comision', label: '% Comisión' }, { id: 'nota_venta', label: 'Nota de venta' },
+    ];
+
+    /* ===================== WORKER: NUEVA VENTA ===================== */
+    function WorkerNuevaVenta({ usuario, estacion, ventasWorker, setVentasWorker }) {
+      const [productoId, setProductoId] = useState('diesel');
+      const [modo, setModo] = useState('galones');
+      const [cantidad, setCantidad] = useState('');
+      const [metodo, setMetodo] = useState('efectivo');
+      const [comprobante, setComprobante] = useState('boleta');
+      const [registrando, setRegistrando] = useState(false);
+      const [registroOk, setRegistroOk] = useState(false);
+      const [carrito, setCarrito] = useState([]);
+      const [clienteNombre, setClienteNombre] = useState('');
+      const [clienteDoc, setClienteDoc] = useState('');
+      const [clienteDireccion, setClienteDireccion] = useState('');
+      const [clientePlaca, setClientePlaca] = useState('');
+
+      const producto = PRODUCTOS.find(p => p.id === productoId);
+      const num = parseFloat(cantidad) || 0;
+      const totalItem = modo === 'galones' ? num * producto.precio : num;
+      const cantidadUnidad = modo === 'galones' ? num : num / producto.precio;
+      const totalCarrito = carrito.reduce((a, item) => a + item.total, 0);
+      const totalFinal = totalCarrito + (num > 0 ? totalItem : 0);
+
+      function agregarAlCarrito() {
+        if (num <= 0) return;
+        const item = {
+          id: Date.now(),
+          productoId: producto.id,
+          nombre: producto.nombre,
+          unidad: producto.unidad,
+          precio: producto.precio,
+          color: producto.color,
+          cantidad: cantidadUnidad,
+          modo: modo,
+          total: totalItem,
+        };
+        setCarrito(prev => [...prev, item]);
+        setCantidad('');
+      }
+
+      function eliminarDelCarrito(id) {
+        setCarrito(prev => prev.filter(item => item.id !== id));
+      }
+
+      function imprimirComprobante(venta) {
+        const gravada = venta.total / 1.18;
+        const igv = venta.total - gravada;
+        const esFactura = venta.comp === 'Factura';
+        const cliente = venta.cliente || {};
+        const ticket = document.createElement('div');
+        ticket.innerHTML = `
+          <div style="font-family: 'Courier New', monospace; font-size: 11px; width: 300px; padding: 12px; color: #000; background: #fff; line-height: 1.4;">
+            <div style="text-align: center; margin-bottom: 4px;"><span style="font-size: 28px;">⛽</span></div>
+            <div style="text-align: center; font-weight: bold; font-size: 18px; letter-spacing: 1px;">GRIFOS KALA</div>
+            <div style="text-align: center; font-size: 10px; margin-top: 2px;">${EMPRESA.razonSocial}</div>
+            <div style="text-align: center; font-size: 9px;">${EMPRESA.direccion}</div>
+            <div style="text-align: center; font-size: 9px;">${EMPRESA.distrito}</div>
+            <div style="text-align: center; font-size: 9px;">TEL: ${EMPRESA.telefono}</div>
+            <div style="border-top: 2px dashed #000; margin: 8px 0;"></div>
+            <div style="text-align: center; font-weight: bold; font-size: 10px;">RUC: ${EMPRESA.ruc}</div>
+            <div style="border-top: 2px dashed #000; margin: 8px 0;"></div>
+            <div style="text-align: center; font-weight: bold; font-size: 13px;">${esFactura ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA'}</div>
+            <div style="text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 4px;">${venta.serie}</div>
+            <div style="border-top: 2px dashed #000; margin: 8px 0;"></div>
+            ${esFactura ? `
+              <div style="font-size: 10px; line-height: 1.5;">
+                <div>CLIENTE : ${cliente.nombre || 'CLIENTE VARIOS'}</div>
+                <div>RUC    : ${cliente.ruc || '—'}</div>
+                <div>DIRECCIÓN: ${cliente.direccion || '—'}</div>
+              </div>
+            ` : `
+              <div style="font-size: 10px; line-height: 1.5;">
+                <div>CLIENTE : ${cliente.nombre || 'CLIENTE VARIOS'}</div>
+                <div>DNI     : ${cliente.dni || '—'}</div>
+              </div>
+            `}
+            <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+            <div style="display: flex; justify-content: space-between; font-size: 10px;">
+              <span>F. EMISIÓN: ${venta.fecha}</span>
+              <span>HORA: ${venta.hora}</span>
+            </div>
+            <div style="font-size: 10px;">MONEDA: SOLES</div>
+            <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+            <div style="display: flex; font-weight: bold; font-size: 9px; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 3px;">
+              <span style="width: 40px;">CANT</span>
+              <span style="width: 30px;">UM</span>
+              <span style="flex: 1;">| DESCRIPCIÓN</span>
+              <span style="width: 45px; text-align: right;">P/U</span>
+              <span style="width: 55px; text-align: right;">TOTAL</span>
+            </div>
+            ${venta.items.map(item => {
+              const um = item.unidad === 'gal' ? 'GLL' : item.unidad === 'litros' ? 'LTR' : item.unidad?.toUpperCase() || 'UNI';
+              return `<div style="display: flex; font-size: 10px; padding: 2px 0;">
+                <span style="width: 40px;">${parseFloat(item.cant) || item.cant}</span>
+                <span style="width: 30px;">${um}</span>
+                <span style="flex: 1;">| ${item.nombre.toUpperCase()}</span>
+                <span style="width: 45px; text-align: right;">${item.precioUnitario?.toFixed(2) || '—'}</span>
+                <span style="width: 55px; text-align: right;">${item.total.toFixed(2)}</span>
+              </div>`;
+            }).join('')}
+            <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+            ${esFactura ? `
+              <div style="display: flex; justify-content: flex-end; font-size: 10px;"><span style="width: 120px;">GRAVADA S/</span><span style="width: 65px; text-align: right;">${gravada.toFixed(2)}</span></div>
+              <div style="display: flex; justify-content: flex-end; font-size: 10px;"><span style="width: 120px;">IGV 18.00% S/</span><span style="width: 65px; text-align: right;">${igv.toFixed(2)}</span></div>
+            ` : ''}
+            <div style="border-top: 1px dashed #000; margin: 4px 0;"></div>
+            <div style="display: flex; justify-content: flex-end; font-weight: bold; font-size: 14px;">
+              <span style="width: 120px;">TOTAL S/</span>
+              <span style="width: 65px; text-align: right;">${venta.total.toFixed(2)}</span>
+            </div>
+            <div style="border-top: 2px dashed #000; margin: 6px 0;"></div>
+            <div style="font-size: 9.5px; margin-bottom: 4px;"><b>SON:</b> ${numeroALetras(venta.total)}</div>
+            <div style="font-size: 10px; margin-bottom: 3px;">PAGO CON: ${venta.metodo.toUpperCase()} MONTO: ${venta.total.toFixed(2)} VUELTO: 0</div>
+            <div style="font-size: 10px; margin-bottom: 3px;">CONDICIÓN DE PAGO: CONTADO</div>
+            ${cliente.placa ? `<div style="font-size: 10px; margin-bottom: 3px;">PLACA: ${cliente.placa}</div>` : ''}
+            <div style="font-size: 10px; margin-bottom: 8px;">ATENDIDO POR: ${(venta.trabajador || '—').toUpperCase()}</div>
+            <div style="border-top: 1px dashed #000; margin: 6px 0;"></div>
+            <div style="text-align: center; font-size: 8px; color: #666; margin-bottom: 4px;">Representación impresa de la</div>
+            <div style="text-align: center; font-size: 8px; color: #666; margin-bottom: 4px;">${esFactura ? 'Factura Electrónica' : 'Boleta de Venta'}</div>
+            <div style="text-align: center; font-size: 8px; color: #666; margin-bottom: 8px;">consulte su comprobante en www.facel.pe</div>
+            <div style="text-align: center; border-top: 2px dashed #000; margin: 6px 0; padding-top: 6px;"></div>
+            <div style="text-align: center; font-size: 10px; font-weight: bold;">¡Gracias por su preferencia!</div>
+            <div style="text-align: center; font-size: 8px; color: #666; margin-top: 4px;">****************************************</div>
+          </div>
+        `;
+        const printWindow = window.open('', '_blank', 'width=320,height=700');
+        printWindow.document.write('<html><head><title>Ticket</title></head><body style="margin:0;padding:0;"></body></html>');
+        printWindow.document.body.appendChild(ticket);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); printWindow.close(); }, 400);
+      }
+
+      function registrarVenta() {
+        const todosItems = [
+          ...carrito,
+          ...(num > 0 ? [{
+            id: Date.now(),
+            nombre: producto.nombre,
+            unidad: producto.unidad,
+            precio: producto.precio,
+            cantidad: cantidadUnidad,
+            total: totalItem,
+          }] : []),
+        ];
+        if (todosItems.length === 0) return;
+        setRegistrando(true);
+        const now = new Date();
+        const totalFinalVenta = todosItems.reduce((a, item) => a + item.total, 0);
+        const serie = comprobante === 'factura' ? 'F001-' + String(Math.floor(Math.random()*99999)+1).padStart(5,'0') : 'B001-' + String(Math.floor(Math.random()*99999)+1).padStart(5,'0');
+        const ventaRegistrada = {
+          id: Date.now(),
+          fecha: formatFechaCorta(now),
+          hora: now.toTimeString().slice(0, 5),
+          producto: todosItems[0].nombre + (todosItems.length > 1 ? ` +${todosItems.length - 1} más` : ''),
+          cant: `${todosItems.reduce((a, it) => a + it.cantidad, 0).toFixed(2)} ${todosItems[0].unidad}`,
+          precioUnitario: todosItems[0].precio,
+          total: totalFinalVenta,
+          metodo: METODOS_WORKER.find(m => m.id === metodo)?.label || 'Efectivo',
+          comp: comprobante === 'factura' ? 'Factura' : 'Boleta',
+          serie: serie,
+          trabajador: usuario,
+          estacion: estacion,
+          cliente: {
+            nombre: clienteNombre || 'CLIENTE VARIOS',
+            ruc: comprobante === 'factura' ? clienteDoc : null,
+            dni: comprobante !== 'factura' ? clienteDoc : null,
+            direccion: clienteDireccion || null,
+            placa: clientePlaca || null,
+          },
+          items: todosItems.map(it => ({
+            nombre: it.nombre,
+            cant: `${it.cantidad.toFixed(2)} ${it.unidad}`,
+            unidad: it.unidad,
+            precioUnitario: it.precio,
+            total: it.total,
+          })),
+        };
+        setTimeout(() => {
+          setVentasWorker(prev => [ventaRegistrada, ...prev]);
+          setRegistrando(false);
+          setRegistroOk(true);
+          setCarrito([]);
+          setCantidad('');
+          setClienteNombre('');
+          setClienteDoc('');
+          setClienteDireccion('');
+          setClientePlaca('');
+          imprimirComprobante(ventaRegistrada);
+          if (comprobante === 'boleta' || comprobante === 'factura') {
+            emitirComprobanteElectronico(ventaRegistrada).then(res => {
+              if (res.ok) console.log('📄 Comprobante enviado a SUNAT exitosamente');
+              else console.warn('⚠️ No se pudo emitir electrónicamente:', res.error);
+            });
+          }
+          setTimeout(() => setRegistroOk(false), 2000);
+        }, 600);
+      }
+
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* 1. SELECCIONA EL PRODUCTO */}
+        <div>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, fontWeight: 600 }}>1. Selecciona el producto</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+            {PRODUCTOS.map(p => {
+              const sel = p.id === productoId;
+              const IconComp = { diesel: WI.Fuel, diesel4: WI.Fuel, urea: WI.Droplet, regular: WI.Gauge }[p.id] || WI.Fuel;
+              return (<button key={p.id} onClick={() => setProductoId(p.id)} type="button" style={{ padding: '16px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', border: `1.5px solid ${sel ? p.color : C.border}`, background: sel ? `${p.color}15` : C.panel, transition: 'all 0.15s' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}><IconComp size={16} color={sel ? p.color : C.muted} /></div>
+                <div style={{ fontFamily: 'Inter', fontSize: 13.5, color: sel ? C.text : C.textDim, fontWeight: sel ? 600 : 500 }}>{p.nombre}</div>
+                <div style={{ fontFamily: 'JetBrains Mono', fontSize: 17, fontWeight: 700, color: p.color, marginTop: 4 }}>S/ {p.precio.toFixed(2)}</div>
+              </button>);
+            })}
+          </div>
+        </div>
+
+        {/* 2. CANTIDAD + AGREGAR */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>2. ¿Cómo te lo piden?</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[{ id: 'galones', label: `Por ${producto.unidad}`, icon: WI.Gauge }, { id: 'soles', label: 'Por soles', icon: WI.Banknote }].map(m => (
+                <button key={m.id} onClick={() => setModo(m.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: `1px solid ${modo === m.id ? C.amber : C.border}`, background: modo === m.id ? C.amberSoft : 'transparent', color: modo === m.id ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                  <m.icon size={13} /> {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input type="number" step="0.01" min="0" placeholder={modo === 'galones' ? `Cantidad en ${producto.unidad}` : 'Monto en S/'} value={cantidad} onChange={e => setCantidad(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') agregarAlCarrito(); }} style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 18, boxSizing: 'border-box' }} />
+            <button onClick={agregarAlCarrito} disabled={num <= 0} type="button" style={{ padding: '14px 20px', borderRadius: 10, border: 'none', background: num <= 0 ? C.panelLight : C.teal, color: num <= 0 ? C.muted : C.bg, fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: num <= 0 ? 'not-allowed' : 'pointer', opacity: num <= 0 ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <WI.Plus size={16} /> Agregar
+            </button>
+          </div>
+        </div>
+
+        {/* CARRITO */}
+        {carrito.length > 0 && (
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
+            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', marginBottom: 10, fontWeight: 600 }}>🛒 Carrito ({carrito.length} items)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {carrito.map(item => (
+                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: C.panel, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: 'Inter', fontSize: 12.5, color: C.text, fontWeight: 500 }}>{item.nombre}</div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>{item.cantidad.toFixed(2)} {item.unidad} × S/ {item.precio.toFixed(2)}</div>
+                  </div>
+                  <div style={{ fontFamily: 'JetBrains Mono', fontSize: 13, fontWeight: 700, color: C.amber }}>{money(item.total)}</div>
+                  <button onClick={() => eliminarDelCarrito(item.id)} type="button" style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 4 }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: C.amber }}>Subtotal carrito: {money(totalCarrito)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* 3. FORMA DE PAGO */}
+        <div>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, fontWeight: 600 }}>3. Forma de pago</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+            {METODOS_WORKER.map(m => {
+              const sel = m.id === metodo;
+              const Icon = METODOS_ICONOS[m.id];
+              return (<button key={m.id} onClick={() => setMetodo(m.id)} type="button" style={{ padding: '12px 6px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', border: `1.5px solid ${sel ? C.amber : C.border}`, background: sel ? C.amberSoft : C.panel, transition: 'all 0.15s' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}><Icon size={18} color={sel ? C.amber : C.muted} /></div>
+                <div style={{ fontFamily: 'Inter', fontSize: 11, color: sel ? C.amber : C.textDim, fontWeight: 500 }}>{m.label}</div>
+              </button>);
+            })}
+          </div>
+        </div>
+
+        {/* 4. COMPROBANTE */}
+        <div>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, fontWeight: 600 }}>4. Comprobante</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {COMPROBANTES_WORKER.map(c => {
+              const sel = c.id === comprobante;
+              const Icon = COMP_ICONOS[c.id];
+              return (<button key={c.id} onClick={() => setComprobante(c.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${sel ? C.amber : C.border}`, background: sel ? C.amberSoft : 'transparent', color: sel ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                <Icon size={13} /> {c.label}
+              </button>);
+            })}
+          </div>
+        </div>
+
+        {/* 5. DATOS DEL CLIENTE */}
+        <div>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, fontWeight: 600 }}>5. Datos del cliente</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>{comprobante === 'factura' ? 'Razón Social' : 'Nombre'}</div>
+              <input placeholder={comprobante === 'factura' ? ' Razón Social' : 'Nombre del cliente'} value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'Inter', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>{comprobante === 'factura' ? 'RUC' : 'DNI'}</div>
+              <input placeholder={comprobante === 'factura' ? 'RUC (11 dígitos)' : 'DNI (8 dígitos)'} value={clienteDoc} onChange={e => setClienteDoc(e.target.value)} maxLength={comprobante === 'factura' ? 11 : 8} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+            {comprobante === 'factura' && (
+              <div>
+                <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>Dirección</div>
+                <input placeholder="Dirección del cliente" value={clienteDireccion} onChange={e => setClienteDireccion(e.target.value)} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'Inter', fontSize: 13, boxSizing: 'border-box' }} />
+              </div>
+            )}
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>Placa (opcional)</div>
+              <input placeholder="ABC-123" value={clientePlaca} onChange={e => setClientePlaca(e.target.value.toUpperCase())} maxLength={8} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, letterSpacing: 1, boxSizing: 'border-box' }} />
+            </div>
+          </div>
+        </div>
+
+        {/* DIVIDER + TOTAL + BOTON */}
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Total a cobrar</div>
+            <div style={{ fontFamily: 'JetBrains Mono', fontSize: 30, fontWeight: 700, color: C.amber, letterSpacing: '0.02em' }}>S/ {totalFinal.toFixed(2)}</div>
+            <div style={{ fontFamily: 'Inter', fontSize: 11.5, color: C.muted, marginTop: 2 }}>{carrito.length + (num > 0 ? 1 : 0)} producto{(carrito.length + (num > 0 ? 1 : 0)) !== 1 ? 's' : ''} · {METODOS_WORKER.find(m => m.id === metodo)?.label}</div>
+          </div>
+          <button onClick={registrarVenta} disabled={(carrito.length === 0 && num <= 0) || registrando} type="button" style={{ display: 'flex', alignItems: 'center', gap: 8, background: registroOk ? C.green : (carrito.length === 0 && num <= 0) ? C.panelLight : C.amber, color: (carrito.length === 0 && num <= 0) ? C.muted : C.bg, border: 'none', borderRadius: 10, padding: '14px 28px', fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: (carrito.length === 0 && num <= 0) ? 'not-allowed' : 'pointer', opacity: (carrito.length === 0 && num <= 0) ? 0.5 : 1, transition: 'all 0.2s' }}>
+            {registrando ? '⏳ Registrando...' : registroOk ? '✅ Venta registrada e imprimir' : '🖨️ Registrar e imprimir'}
+          </button>
+        </div>
+      </div>);
+    }
+
+    /* ===================== WORKER: CIERRE DE TURNO ===================== */
+    function WorkerCierreTurno({ ventasWorker, estacion, usuario, trabajador, maquinas: maquinasProp }) {
+      const isMobile = useIsMobile();
+      const [maquinasSeleccionadas, setMaquinasSeleccionadas] = useState([]);
+
+      const maquinasDisponibles = useMemo(() => {
+        let all = [];
+        if (maquinasProp && maquinasProp.length > 0) all = maquinasProp;
+        else if (trabajador && trabajador.maquinasAsignadas && trabajador.maquinasAsignadas.length > 0) {
+          all = trabajador.maquinasAsignadas;
+        }
+        return all.filter(m => m.estacion === estacion);
+      }, [maquinasProp, trabajador, estacion]);
+
+      function toggleMaquinaSeleccionada(mId) {
         setMaquinasSeleccionadas(prev => 
           prev.includes(mId) ? prev.filter(x => x !== mId) : [...prev, mId]
         );
