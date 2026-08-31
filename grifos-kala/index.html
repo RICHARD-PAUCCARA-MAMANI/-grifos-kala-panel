@@ -1302,6 +1302,227 @@
       ChevronDown: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
     };
 
+    /* ===================== WORKER: NUEVA VENTA ===================== */
+    function WorkerNuevaVenta({ usuario, estacion, ventasWorker, setVentasWorker }) {
+      const isMobile = useIsMobile();
+      const [productoId, setProductoId] = useState(PRODUCTOS[0].id);
+      const [cantidad, setCantidad] = useState('');
+      const [porSoles, setPorSoles] = useState(false);
+      const [metodoPago, setMetodoPago] = useState('Efectivo');
+      const [tipoComprobante, setTipoComprobante] = useState('Boleta');
+      const [carrito, setCarrito] = useState([]);
+      // Datos del cliente
+      const [clienteNombre, setClienteNombre] = useState('');
+      const [clienteDoc, setClienteDoc] = useState('');
+      const [clienteDireccion, setClienteDireccion] = useState('');
+      const [clientePlaca, setClientePlaca] = useState('');
+
+      const METODOS_PAGO = [
+        { id: 'efectivo', label: 'Efectivo', icon: WI.Banknote, color: C.green },
+        { id: 'tarjeta', label: 'Tarjeta', icon: WI.CreditCard, color: C.teal },
+        { id: 'yape', label: 'Yape', icon: WI.Smartphone, color: '#7B2D8E' },
+        { id: 'transferencia', label: 'Transferencia', icon: WI.ArrowLeftRight, color: C.blue },
+        { id: 'deposito', label: 'Depósito', icon: WI.FileText, color: C.amber },
+      ];
+
+      const METODOS_WORKER = [
+        { id: 'efectivo', label: 'Efectivo' }, { id: 'tarjeta', label: 'Tarjeta' },
+        { id: 'yape', label: 'Yape' }, { id: 'transferencia', label: 'Transferencia' },
+        { id: 'deposito', label: 'Depósito' },
+      ];
+
+      const producto = PRODUCTOS.find(p => p.id === productoId);
+      const numCantidad = parseFloat(cantidad) || 0;
+      let subtotalItem = 0;
+      if (producto && numCantidad > 0) {
+        subtotalItem = porSoles ? numCantidad : numCantidad * producto.precio;
+      }
+      const subtotalCarrito = carrito.reduce((a, it) => a + it.total, 0);
+      const totalGeneral = subtotalCarrito;
+
+      function agregarAlCarrito() {
+        if (!producto || numCantidad <= 0) return;
+        const galonesLitros = porSoles ? (numCantidad / producto.precio) : numCantidad;
+        const total = porSoles ? numCantidad : numCantidad * producto.precio;
+        setCarrito(prev => [...prev, {
+          id: Date.now(),
+          producto: producto.nombre,
+          productoId: producto.id,
+          cant: galonesLitros.toFixed(2) + ' ' + producto.unidad,
+          precioUnitario: producto.precio,
+          total: Math.round(total * 100) / 100,
+        }]);
+        setCantidad('');
+      }
+
+      function eliminarDelCarrito(id) {
+        setCarrito(prev => prev.filter(it => it.id !== id));
+      }
+
+      function imprimirComprobante(ventaRegistrada) {
+        const w = window.open('', '_blank', 'width=400,height=700');
+        const now = new Date();
+        const fecha = now.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+        let itemsHtml = '';
+        ventaRegistrada.items.forEach(it => {
+          itemsHtml += `<tr><td style='padding:3px 4px;font-size:11px'>1</td><td style='padding:3px 4px;font-size:11px'>${it.unidad || 'GLL'}</td><td style='padding:3px 4px;font-size:11px'>${it.producto}</td><td style='padding:3px 4px;font-size:11px;text-align:right'>${it.precioUnitario.toFixed(2)}</td><td style='padding:3px 4px;font-size:11px;text-align:right'>${it.total.toFixed(2)}</td></tr>`;
+        });
+        const esFactura = ventaRegistrada.comp === 'Factura';
+        w.document.write(`<!DOCTYPE html><html><head><meta charset='utf-8'><title>Comprobante</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Courier New',monospace;padding:12px;width:280px;font-size:11px;color:#000;background:#fff}.center{text-align:center}.line{border-top:1px dashed #000;margin:4px 0}.total{font-size:14px;font-weight:700;margin:6px 0}.small{font-size:9px;color:#555}@media print{body{padding:5px}}</style></head><body>
+<div class='center'><div style='font-size:16px;font-weight:700'>⛽ GRIFOS KALA</div><div style='font-size:9px'>${EMPRESA.razonSocial}</div><div style='font-size:9px'>RUC: ${EMPRESA.ruc}</div><div style='font-size:9px'>${EMPRESA.direccion}</div><div style='font-size:9px'>${EMPRESA.distrito} - Tel: ${EMPRESA.telefono}</div></div>
+<div class='line'></div>
+<div class='center' style='font-size:10px;font-weight:700'>${esFactura ? 'FACTURA' : 'BOLETA'} DE VENTA</div>
+<div class='center' style='font-size:10px'>Serie: ${ventaRegistrada.serie}</div>
+<div class='line'></div>
+<div style='font-size:10px'>Cliente: ${ventaRegistrada.clienteNombre || 'Cliente Varios'}</div>
+<div style='font-size:10px'>DNI/RUC: ${ventaRegistrada.clienteDoc || '---'}</div>
+${ventaRegistrada.clienteDireccion ? '<div style="font-size:10px">Dir: ' + ventaRegistrada.clienteDireccion + '</div>' : ''}
+<div style='font-size:10px'>Fecha: ${fecha}  Hora: ${hora}</div>
+${ventaRegistrada.clientePlaca ? '<div style="font-size:10px">Placa: ' + ventaRegistrada.clientePlaca + '</div>' : ''}
+<div class='line'></div>
+<table style='width:100%;border-collapse:collapse'><thead><tr style='border-bottom:1px solid #000'><th style='padding:3px 4px;font-size:9px;text-align:left'>CANT</th><th style='padding:3px 4px;font-size:9px;text-align:left'>UM</th><th style='padding:3px 4px;font-size:9px;text-align:left'>DESCRIPCIÓN</th><th style='padding:3px 4px;font-size:9px;text-align:right'>P/U</th><th style='padding:3px 4px;font-size:9px;text-align:right'>TOTAL</th></tr></thead><tbody>${itemsHtml}</tbody></table>
+<div class='line'></div>
+${esFactura ? '<div style="display:flex;justify-content:space-between;font-size:10px"><span>Gravada:</span><span>S/ ' + (totalGeneral / 1.18).toFixed(2) + '</span></div><div style="display:flex;justify-content:space-between;font-size:10px"><span>IGV (18%):</span><span>S/ ' + (totalGeneral - totalGeneral / 1.18).toFixed(2) + '</span></div>' : ''}
+<div class='total' style='display:flex;justify-content:space-between;border-top:2px solid #000;padding-top:4px'><span>TOTAL:</span><span>S/ ${totalGeneral.toFixed(2)}</span></div>
+<div style='font-size:9px;margin:4px 0'>Son: ${numeroALetras(totalGeneral)}</div>
+<div class='line'></div>
+<div style='font-size:10px'>Pago: ${ventaRegistrada.metodo}</div>
+<div style='font-size:10px'>Atendido por: ${ventaRegistrada.trabajador}</div>
+<div class='line'></div>
+<div class='center small'>Representación impresa de la ${esFactura ? 'factura' : 'boleta'} electrónica</div>
+<div class='center' style='margin-top:8px;font-size:10px;font-weight:700'>¡Gracias por su preferencia!</div>
+</body></html>`);
+        w.document.close();
+        setTimeout(() => { w.print(); }, 500);
+      }
+
+      function registrarVenta() {
+        if (carrito.length === 0) return;
+        const now = new Date();
+        const serie = tipoComprobante === 'factura' ? 'F001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0') : 'B001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0');
+        const ventaRegistrada = {
+          id: Date.now(),
+          fecha: formatFechaCorta(now),
+          hora: now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
+          producto: carrito[0].producto,
+          cant: carrito.map(c => c.cant).join(' + '),
+          precioUnitario: carrito[0].precioUnitario,
+          total: totalGeneral,
+          metodo: metodoPago,
+          comp: tipoComprobante,
+          serie,
+          trabajador: usuario,
+          clienteNombre,
+          clienteDoc,
+          clienteDireccion,
+          clientePlaca,
+          items: carrito.map(c => ({ producto: c.producto, cant: c.cant, precioUnitario: c.precioUnitario, total: c.total, unidad: c.cant.includes('litros') ? 'LTR' : 'GLL' })),
+        };
+        setVentasWorker(prev => [...prev, ventaRegistrada]);
+        imprimirComprobante(ventaRegistrada);
+        setCarrito([]);
+        setClienteNombre(''); setClienteDoc(''); setClienteDireccion(''); setClientePlaca('');
+      }
+
+      return (<div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ fontFamily: 'Oswald', fontSize: 16, fontWeight: 700, color: C.text, textTransform: 'uppercase', letterSpacing: '0.03em' }}>🛒 NUEVA VENTA</div>
+
+        {/* 1. SELECCIONAR PRODUCTO */}
+        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>1. Selecciona el producto</div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 8 }}>
+            {PRODUCTOS.map(p => (
+              <button key={p.id} onClick={() => setProductoId(p.id)} type="button" style={{ padding: '12px 10px', borderRadius: 10, border: `2px solid ${productoId === p.id ? p.color : C.border}`, background: productoId === p.id ? p.soft : C.panel, cursor: 'pointer', textAlign: 'center' }}>
+                <div style={{ fontFamily: 'Oswald', fontSize: 13, fontWeight: 600, color: productoId === p.id ? p.color : C.textDim, textTransform: 'uppercase' }}>{p.nombre}</div>
+                <div style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: p.color, marginTop: 4 }}>S/ {p.precio.toFixed(2)}</div>
+                <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>/ {p.unidad}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 2. CANTIDAD */}
+        {producto && (
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>2. ¿Cómo te lo piden?</div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <button onClick={() => setPorSoles(false)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${!porSoles ? producto.color : C.border}`, background: !porSoles ? producto.soft : 'transparent', color: !porSoles ? producto.color : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Por {producto.unidad}</button>
+              <button onClick={() => setPorSoles(true)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${porSoles ? C.amber : C.border}`, background: porSoles ? C.amberSoft : 'transparent', color: porSoles ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Por soles</button>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>{porSoles ? 'Monto en soles' : 'Cantidad en ' + producto.unidad}</div>
+                <input type="number" step="0.01" min="0" placeholder={porSoles ? 'S/ 0.00' : 'Cantidad en ' + producto.unidad} value={cantidad} onChange={e => setCantidad(e.target.value)} onKeyDown={e => e.key === 'Enter' && agregarAlCarrito()} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 14, boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ fontFamily: 'JetBrains Mono', fontSize: 16, fontWeight: 700, color: producto.color, minWidth: 100, textAlign: 'right' }}>S/ {subtotalItem.toFixed(2)}</div>
+              <button onClick={agregarAlCarrito} type="button" style={{ padding: '10px 16px', borderRadius: 8, background: producto.color, color: '#fff', border: 'none', fontFamily: 'Inter', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}><WI.Plus size={14} /> Agregar</button>
+            </div>
+          </div>
+        )}
+
+        {/* CARRITO */}
+        {carrito.length > 0 && (
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>Carrito ({carrito.length} items)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {carrito.map(it => (
+                <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: C.panel, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.text, fontWeight: 500 }}>{it.producto}</div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>{it.cant} × S/ {it.precioUnitario.toFixed(2)}</div>
+                  </div>
+                  <div style={{ fontFamily: 'JetBrains Mono', fontSize: 13, fontWeight: 700, color: C.amber }}>S/ {it.total.toFixed(2)}</div>
+                  <button onClick={() => eliminarDelCarrito(it.id)} type="button" style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 4 }}><WI.Trash2 size={14} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 3. FORMA DE PAGO */}
+        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>3. Forma de pago</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {METODOS_PAGO.map(m => (
+              <button key={m.id} onClick={() => setMetodoPago(m.label)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1.5px solid ${metodoPago === m.label ? m.color : C.border}`, background: metodoPago === m.label ? m.color + '22' : 'transparent', color: metodoPago === m.label ? m.color : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                <m.icon size={14} /> {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 4. COMPROBANTE + CLIENTE */}
+        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>4. Comprobante</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {[{ label: 'Boleta' }, { label: 'Factura' }, { label: 'Nota de venta' }].map(c => (
+              <button key={c.label} onClick={() => setTipoComprobante(c.label)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1.5px solid ${tipoComprobante === c.label ? C.amber : C.border}`, background: tipoComprobante === c.label ? C.amberSoft : 'transparent', color: tipoComprobante === c.label ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{c.label}</button>
+            ))}
+          </div>
+          {/* Datos del cliente */}
+          <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Datos del cliente</div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 8 }}>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Nombre / Razón Social</div><input placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} /></div>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>{tipoComprobante === 'Factura' ? 'RUC' : 'DNI'}</div><input placeholder={tipoComprobante === 'Factura' ? 'RUC (11 dígitos)' : 'DNI (8 dígitos)'} value={clienteDoc} onChange={e => setClienteDoc(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} /></div>
+            {tipoComprobante === 'Factura' && <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Dirección</div><input placeholder="Dirección fiscal" value={clienteDireccion} onChange={e => setClienteDireccion(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} /></div>}
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Placa (opcional)</div><input placeholder="ABC-123" value={clientePlaca} onChange={e => setClientePlaca(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} /></div>
+          </div>
+        </div>
+
+        {/* 5. TOTAL + REGISTRAR */}
+        <div style={{ background: C.amberSoft, border: `2px solid ${C.amber}`, borderRadius: 12, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Total a cobrar</div>
+            <div style={{ fontFamily: 'JetBrains Mono', fontSize: 26, fontWeight: 700, color: C.amber }}>S/ {totalGeneral.toFixed(2)}</div>
+          </div>
+          <button onClick={registrarVenta} disabled={carrito.length === 0} type="button" style={{ padding: '12px 28px', borderRadius: 10, background: carrito.length > 0 ? C.amber : C.border, color: carrito.length > 0 ? C.bg : C.muted, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: carrito.length > 0 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 8 }}>
+            🖨️ Registrar e imprimir
+          </button>
+        </div>
+      </div>);
+    }
+
     /* ===================== WORKER: CIERRE DE TURNO ===================== */
     function WorkerCierreTurno({ ventasWorker, estacion, usuario, trabajador, maquinas: maquinasProp }) {
       const isMobile = useIsMobile();
@@ -2010,6 +2231,7 @@ ${gastosRows ? `<h2>💰 Gastos de Turno</h2><table><thead><tr><th>Concepto</th>
     }
 
     /* ===================== RENDER ===================== */
+    window.onerror = function(msg, src, line, col, err) { document.getElementById('root').innerHTML = '<div style="padding:20px;color:#f44;font-family:monospace;background:#1a1a1a;min-height:100vh"><h2>❌ Error</h2><pre style="white-space:pre-wrap;margin-top:10px;font-size:13px">' + msg + '\nLine: ' + line + ':' + col + '\n' + (err && err.stack ? err.stack : '') + '</pre></div>'; };
     ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
 </body>
