@@ -2282,8 +2282,8 @@ ${esFactura ? `<div style='margin-bottom:2mm'>
           <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
             <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>2. ¿Cómo te lo piden?</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <button onClick={() => setPorSoles(false)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${!porSoles ? producto.color : C.border}`, background: !porSoles ? producto.soft : 'transparent', color: !porSoles ? producto.color : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Por {producto.unidad}</button>
               <button onClick={() => setPorSoles(true)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${porSoles ? C.amber : C.border}`, background: porSoles ? C.amberSoft : 'transparent', color: porSoles ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Por soles</button>
+              <button onClick={() => setPorSoles(false)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${!porSoles ? producto.color : C.border}`, background: !porSoles ? producto.soft : 'transparent', color: !porSoles ? producto.color : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Por {producto.unidad}</button>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
               <div style={{ flex: 1 }}>
