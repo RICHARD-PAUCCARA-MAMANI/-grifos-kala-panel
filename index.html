@@ -69,7 +69,12 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#12161A" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Panel de Operaciones Grifos Kala - Sistema de gestión para estaciones de servicio" />
+  <link rel="manifest" href="manifest.json" />
   <title>Grifos Kala — Panel de Operaciones</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23E8A33D'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='%2312161A'>⛽</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -92,10 +97,40 @@
     ::-webkit-scrollbar-thumb { background: #343E46; border-radius: 3px; }
     .hide-mobile { display: initial; }
     .tabs-scroll { display: flex; gap: 8px; }
+    
+    /* Multiplatform Responsive Design */
     @media (max-width: 640px) {
       .hide-mobile { display: none !important; }
       .tabs-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-wrap: nowrap; padding-bottom: 4px; }
       .tabs-scroll::-webkit-scrollbar { display: none; }
+    }
+    
+    @media (min-width: 641px) and (max-width: 1024px) {
+      /* Tablet styles */
+      .hide-tablet { display: none !important; }
+    }
+    
+    /* Touch-friendly buttons */
+    @media (pointer: coarse) {
+      button, input, select {
+        min-height: 44px;
+        min-width: 44px;
+      }
+    }
+    
+    /* PWA-like meta tags */
+    @media (display-mode: standalone) {
+      body { padding-top: env(safe-area-inset-top); }
+    }
+    
+    /* Safe area for notch devices */
+    @supports (padding: env(safe-area-inset-top)) {
+      body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+      }
     }
   </style>
 </head>
@@ -114,8 +149,19 @@
     
     // Inicializar cliente de Supabase
     let supabase = null;
-    if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
-      supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+    try {
+      if (SUPABASE_URL && SUPABASE_ANON_KEY && 
+          SUPABASE_URL !== 'YOUR_SUPABASE_URL' && 
+          SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY' &&
+          window.supabase && window.supabase.createClient) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('✅ Supabase connected successfully');
+      } else {
+        console.warn('⚠️ Supabase not configured - using local data');
+      }
+    } catch (err) {
+      console.error('❌ Supabase initialization error:', err);
+      supabase = null;
     }
     
     // Funciones de ayuda para Supabase
