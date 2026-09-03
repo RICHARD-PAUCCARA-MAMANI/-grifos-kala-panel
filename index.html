@@ -1908,63 +1908,63 @@
 
         let itemsHtml = '';
         ventaRegistrada.items.forEach(it => {
-          itemsHtml += `<tr style='border-bottom:2px dotted #999'>
-            <td style='padding:3mm 0;font-weight:800;font-size:13px'>${it.producto}</td>
-            <td style='padding:3mm 0;text-align:right;font-weight:900;font-size:14px;white-space:nowrap'>S/ ${it.total.toFixed(2)}</td>
+          itemsHtml += `<tr style='border-bottom:1.5px dotted #999'>
+            <td style='padding:2mm 0;font-weight:800;font-size:10px'>${it.producto}</td>
+            <td style='padding:2mm 0;text-align:right;font-weight:900;font-size:11px;white-space:nowrap'>S/ ${it.total.toFixed(2)}</td>
           </tr>
           <tr style='border-bottom:none'>
-            <td style='padding:0 0 3mm 3mm;font-size:11px;color:#333;font-weight:700' colspan='2'>${parseFloat(it.cant).toFixed(2)} ${it.unidad || 'gal'} x S/ ${it.precioUnitario.toFixed(2)}</td>
+            <td style='padding:0 0 2mm 2mm;font-size:8px;color:#333;font-weight:700' colspan='2'>${parseFloat(it.cant).toFixed(2)} ${it.unidad || 'gal'} x S/ ${it.precioUnitario.toFixed(2)}</td>
           </tr>`;
         });
 
         w.document.write(`<!DOCTYPE html><html><head><meta charset='utf-8'><title>Comprobante</title>
 <style>
-  @page { size: 80mm auto; margin: 2mm; }
+  @page { size: 58mm auto; margin: 2mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', 'Lucida Console', 'Consolas', monospace; padding: 4mm; width: 72mm; font-size: 14px; font-weight: 700; color: #000; background: #fff; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: 0.3px; }
+  body { font-family: 'Courier New', 'Lucida Console', 'Consolas', monospace; padding: 3mm; width: 52mm; font-size: 11px; font-weight: 700; color: #000; background: #fff; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: 0.2px; }
   .c { text-align: center; }
   .b { font-weight: 900; }
-  .sep { border-top: 2px dashed #000; margin: 3mm 0; }
-  .sep2 { border-top: 3px solid #000; margin: 3mm 0; }
-  .sep3 { border-top: 1.5px solid #666; margin: 2.5mm 0; }
+  .sep { border-top: 1.5px dashed #000; margin: 2.5mm 0; }
+  .sep2 { border-top: 2.5px solid #000; margin: 2.5mm 0; }
+  .sep3 { border-top: 1px solid #666; margin: 2mm 0; }
   .row { display: flex; justify-content: space-between; align-items: baseline; }
-  .small { font-size: 11px; color: #333; font-weight: 600; }
-  .big { font-size: 22px; font-weight: 900; }
-  .total-box { border: 3px solid #000; padding: 3mm 4mm; margin: 3mm 0; background: #f5f5f5; }
-  .total-row { font-size: 18px; font-weight: 900; }
+  .small { font-size: 9px; color: #333; font-weight: 600; }
+  .big { font-size: 16px; font-weight: 900; }
+  .total-box { border: 2.5px solid #000; padding: 2.5mm 3mm; margin: 2.5mm 0; background: #f5f5f5; }
+  .total-row { font-size: 14px; font-weight: 900; }
   table { width: 100%; border-collapse: collapse; }
-  td { padding: 2px 0; font-size: 13px; font-weight: 700; }
-  .th { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #000; border-bottom: 2px solid #000; padding: 2mm 0; }
-  .cut { border-top: 3px dashed #000; margin-top: 5mm; padding-top: 4mm; text-align: center; font-size: 12px; color: #666; font-weight: 600; }
-  @media print { body { padding: 2mm; width: 76mm; } }
+  td { padding: 1.5px 0; font-size: 10px; font-weight: 700; }
+  .th { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px; color: #000; border-bottom: 2px solid #000; padding: 1.5mm 0; }
+  .cut { border-top: 2.5px dashed #000; margin-top: 4mm; padding-top: 3mm; text-align: center; font-size: 10px; color: #666; font-weight: 600; }
+  @media print { body { padding: 2mm; width: 54mm; } }
 </style></head><body>
 
 <!-- ═══ ENCABEZADO ═══ -->
 <div class='c'>
-  <div style='font-size:24px;font-weight:900;letter-spacing:3px'>⛽ GRIFOS KALA</div>
-  <div style='font-size:12px;font-weight:700;margin-top:2mm;color:#222'>${EMPRESA.razonSocial}</div>
-  <div style='font-size:12px;font-weight:700;color:#222'>RUC: ${EMPRESA.ruc}</div>
-  <div style='font-size:11px;font-weight:600;color:#333'>${EMPRESA.direccion}</div>
-  <div style='font-size:11px;font-weight:600;color:#333'>${EMPRESA.distrito} · Tel: ${EMPRESA.telefono}</div>
+  <div style='font-size:16px;font-weight:900;letter-spacing:2px'>⛽ GRIFOS KALA</div>
+  <div style='font-size:9px;font-weight:700;margin-top:1.5mm;color:#222'>${EMPRESA.razonSocial}</div>
+  <div style='font-size:9px;font-weight:700;color:#222'>RUC: ${EMPRESA.ruc}</div>
+  <div style='font-size:8px;font-weight:600;color:#333'>${EMPRESA.direccion}</div>
+  <div style='font-size:8px;font-weight:600;color:#333'>${EMPRESA.distrito} · Tel: ${EMPRESA.telefono}</div>
 </div>
 
 <div class='sep2'></div>
 
 <!-- ═══ TIPO DE COMPROBANTE ═══ -->
 <div class='c'>
-  <div style='font-size:18px;font-weight:900;letter-spacing:3px;border:2.5px solid #000;display:inline-block;padding:2mm 5mm;margin:2mm 0'>${esFactura ? 'FACTURA' : 'BOLETA'} DE VENTA</div>
-  <div style='font-size:14px;font-weight:900;margin-top:2mm'>N° ${ventaRegistrada.serie}</div>
+  <div style='font-size:13px;font-weight:900;letter-spacing:2px;border:2px solid #000;display:inline-block;padding:2mm 4mm;margin:2mm 0'>${esFactura ? 'FACTURA' : 'BOLETA'} DE VENTA</div>
+  <div style='font-size:11px;font-weight:900;margin-top:1.5mm'>N° ${ventaRegistrada.serie}</div>
 </div>
 
 <div class='sep2'></div>
 
 <!-- ═══ DATOS DEL CLIENTE ═══ -->
-<div style='margin-bottom:3mm'>
-  <div style='font-size:11px;font-weight:900;letter-spacing:1.5px;color:#000;margin-bottom:2mm'>DATOS DEL CLIENTE</div>
-  <div style='font-size:13px;font-weight:700;line-height:2'>
+<div style='margin-bottom:2.5mm'>
+  <div style='font-size:9px;font-weight:900;letter-spacing:1px;color:#000;margin-bottom:1.5mm'>DATOS DEL CLIENTE</div>
+  <div style='font-size:10px;font-weight:700;line-height:1.8'>
     <div class='row'><span style='color:#333'>Cliente:</span><span class='b'>${ventaRegistrada.clienteNombre || 'CLIENTE VARIOS'}</span></div>
     <div class='row'><span style='color:#333'>${esFactura ? 'RUC' : 'DNI'}:</span><span class='b'>${ventaRegistrada.clienteDoc || '---'}</span></div>
-    ${ventaRegistrada.clienteDireccion ? `<div class='row'><span style='color:#333'>Dirección:</span><span>${ventaRegistrada.clienteDireccion}</span></div>` : ''}
+    ${ventaRegistrada.clienteDireccion ? `<div class='row'><span style='color:#333'>Dir:</span><span>${ventaRegistrada.clienteDireccion}</span></div>` : ''}
     ${ventaRegistrada.clientePlaca ? `<div class='row'><span style='color:#333'>Placa:</span><span class='b'>${ventaRegistrada.clientePlaca}</span></div>` : ''}
   </div>
 </div>
@@ -1972,19 +1972,19 @@
 <div class='sep3'></div>
 
 <!-- ═══ FECHA Y HORA ═══ -->
-<div class='row' style='font-size:13px;font-weight:700'>
+<div class='row' style='font-size:10px;font-weight:700'>
   <span style='color:#333'>Fecha:</span><span class='b'>${fecha}</span>
 </div>
-<div class='row' style='font-size:13px;font-weight:700'>
+<div class='row' style='font-size:10px;font-weight:700'>
   <span style='color:#333'>Hora:</span><span class='b'>${hora}</span>
 </div>
 
 <div class='sep'></div>
 
 <!-- ═══ DETALLE DE PRODUCTOS ═══ -->
-<div style='font-size:11px;font-weight:900;letter-spacing:1.5px;color:#000;margin-bottom:3mm'>DETALLE DE PRODUCTOS</div>
+<div style='font-size:9px;font-weight:900;letter-spacing:1px;color:#000;margin-bottom:2mm'>DETALLE DE PRODUCTOS</div>
 <table>
-  <thead><tr><th class='th' style='text-align:left'>Descripción</th><th class='th' style='text-align:right;width:24mm'>Total</th></tr></thead>
+  <thead><tr><th class='th' style='text-align:left'>Descripción</th><th class='th' style='text-align:right;width:18mm'>Total</th></tr></thead>
   <tbody>${itemsHtml}</tbody>
 </table>
 
@@ -1992,32 +1992,32 @@
 
 <!-- ═══ TOTALES ═══ -->
 ${esFactura ? `<div style='margin-bottom:2mm'>
-  <div class='row' style='font-size:13px;font-weight:700'><span style='color:#333'>Base imponible:</span><span>S/ ${sub.toFixed(2)}</span></div>
-  <div class='row' style='font-size:13px;font-weight:700'><span style='color:#333'>IGV (18%):</span><span>S/ ${igv.toFixed(2)}</span></div>
+  <div class='row' style='font-size:10px;font-weight:700'><span style='color:#333'>Base:</span><span>S/ ${sub.toFixed(2)}</span></div>
+  <div class='row' style='font-size:10px;font-weight:700'><span style='color:#333'>IGV 18%:</span><span>S/ ${igv.toFixed(2)}</span></div>
 </div>` : ''}
 <div class='total-box'>
-  <div class='row total-row'><span>TOTAL A PAGAR</span><span>S/ ${ventaRegistrada.total.toFixed(2)}</span></div>
+  <div class='row total-row'><span>TOTAL</span><span>S/ ${ventaRegistrada.total.toFixed(2)}</span></div>
 </div>
-<div style='font-size:12px;font-weight:700;margin:3mm 0;color:#000;line-height:1.8'>Son: <b>${numeroALetras(ventaRegistrada.total)}</b></div>
+<div style='font-size:9px;font-weight:700;margin:2mm 0;color:#000;line-height:1.6'>Son: <b>${numeroALetras(ventaRegistrada.total)}</b></div>
 
 <div class='sep'></div>
 
 <!-- ═══ FORMA DE PAGO ═══ -->
-<div style='margin-bottom:3mm'>
-  <div style='font-size:11px;font-weight:900;letter-spacing:1.5px;color:#000;margin-bottom:2mm'>FORMA DE PAGO</div>
-  <div style='font-size:13px;font-weight:700;line-height:2'>
-    <div class='row'><span style='color:#333'>Medio de pago:</span><span class='b'>${ventaRegistrada.metodo}</span></div>
-    <div class='row'><span style='color:#333'>Atendido por:</span><span class='b'>${ventaRegistrada.trabajador}</span></div>
+<div style='margin-bottom:2.5mm'>
+  <div style='font-size:9px;font-weight:900;letter-spacing:1px;color:#000;margin-bottom:1.5mm'>FORMA DE PAGO</div>
+  <div style='font-size:10px;font-weight:700;line-height:1.8'>
+    <div class='row'><span style='color:#333'>Pago:</span><span class='b'>${ventaRegistrada.metodo}</span></div>
+    <div class='row'><span style='color:#333'>Atendido:</span><span class='b'>${ventaRegistrada.trabajador}</span></div>
   </div>
 </div>
 
 <div class='sep'></div>
 
 <!-- ═══ PIE ═══ -->
-<div class='c small' style='line-height:1.8'>Representación impresa de la ${esFactura ? 'factura' : 'boleta'}<br>electrónica</div>
-<div class='c' style='margin-top:5mm;font-size:16px;font-weight:900;letter-spacing:1px'>¡GRACIAS POR SU PREFERENCIA!</div>
+<div class='c small' style='line-height:1.6'>Rep. impresa de la ${esFactura ? 'factura' : 'boleta'}<br>electrónica</div>
+<div class='c' style='margin-top:4mm;font-size:12px;font-weight:900;letter-spacing:0.5px'>¡GRACIAS!</div>
 
-<div class='cut'>✂ - - - - - - - - - - - - - - - - - - - - ✂</div>
+<div class='cut'>✂ - - - - - - - - - - - - ✂</div>
 
 </body></html>`);
         w.document.close();
@@ -2496,42 +2496,42 @@ ${esFactura ? `<div style='margin-bottom:2mm'>
 <!DOCTYPE html>
 <html><head><meta charset='utf-8'><title>Cierre de Turno - ${nom}</title>
 <style>
-  @page { size: 80mm auto; margin: 2mm; }
+  @page { size: 58mm auto; margin: 2mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', 'Lucida Console', 'Consolas', monospace; padding: 4mm; width: 72mm; font-size: 13px; font-weight: 700; color: #000; background: #fff; line-height: 1.6; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: 0.3px; }
+  body { font-family: 'Courier New', 'Lucida Console', 'Consolas', monospace; padding: 3mm; width: 52mm; font-size: 10px; font-weight: 700; color: #000; background: #fff; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: 0.2px; }
   .c { text-align: center; }
   .b { font-weight: 900; }
-  .sep { border-top: 2px dashed #000; margin: 3mm 0; }
-  .sep2 { border-top: 3px solid #000; margin: 3mm 0; }
-  .sep3 { border-top: 1.5px solid #666; margin: 2.5mm 0; }
+  .sep { border-top: 1.5px dashed #000; margin: 2.5mm 0; }
+  .sep2 { border-top: 2.5px solid #000; margin: 2.5mm 0; }
+  .sep3 { border-top: 1px solid #666; margin: 2mm 0; }
   .row { display: flex; justify-content: space-between; }
-  .section { font-size: 12px; font-weight: 900; letter-spacing: 1.5px; color: #000; margin: 4mm 0 2mm; text-transform: uppercase; }
-  .section::after { content: ''; display: block; border-bottom: 2px solid #000; margin-top: 1.5mm; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 3mm; font-size: 12px; font-weight: 700; }
-  th { text-align: left; font-weight: 900; border-bottom: 2px solid #000; padding: 2mm 0; font-size: 11px; letter-spacing: 1px; color: #000; text-transform: uppercase; }
-  td { padding: 2mm 0; border-bottom: 1.5px dotted #999; }
-  .total-row td { border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 3mm 0; font-weight: 900; }
-  .summary-box { border: 3px solid #000; padding: 3mm 4mm; margin: 3mm 0; background: #f5f5f5; }
-  .big { font-size: 24px; font-weight: 900; }
-  .small { font-size: 11px; color: #333; font-weight: 600; }
-  .cut { border-top: 3px dashed #000; margin-top: 5mm; padding-top: 4mm; text-align: center; font-size: 12px; color: #666; font-weight: 600; }
-  @media print { body { padding: 2mm; width: 76mm; } }
+  .section { font-size: 9px; font-weight: 900; letter-spacing: 1px; color: #000; margin: 3mm 0 1.5mm; text-transform: uppercase; }
+  .section::after { content: ''; display: block; border-bottom: 1.5px solid #000; margin-top: 1mm; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 2.5mm; font-size: 9px; font-weight: 700; }
+  th { text-align: left; font-weight: 900; border-bottom: 1.5px solid #000; padding: 1.5mm 0; font-size: 8px; letter-spacing: 0.5px; color: #000; text-transform: uppercase; }
+  td { padding: 1.5mm 0; border-bottom: 1px dotted #999; }
+  .total-row td { border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 2mm 0; font-weight: 900; }
+  .summary-box { border: 2.5px solid #000; padding: 2.5mm 3mm; margin: 2.5mm 0; background: #f5f5f5; }
+  .big { font-size: 18px; font-weight: 900; }
+  .small { font-size: 8px; color: #333; font-weight: 600; }
+  .cut { border-top: 2.5px dashed #000; margin-top: 4mm; padding-top: 3mm; text-align: center; font-size: 9px; color: #666; font-weight: 600; }
+  @media print { body { padding: 2mm; width: 54mm; } }
 </style></head><body>
 
 <!-- ═══ ENCABEZADO ═══ -->
 <div class='c'>
-  <div style='font-size:22px;font-weight:900;letter-spacing:3px'>⛽ GRIFOS KALA</div>
-  <div style='font-size:13px;font-weight:700;margin-top:2mm;color:#222'>REPORTE DE CIERRE DE TURNO</div>
+  <div style='font-size:14px;font-weight:900;letter-spacing:2px'>⛽ GRIFOS KALA</div>
+  <div style='font-size:9px;font-weight:700;margin-top:1.5mm;color:#222'>CIERRE DE TURNO</div>
 </div>
 
 <div class='sep2'></div>
 
 <!-- ═══ DATOS DEL TURNO ═══ -->
-<div style='font-size:13px;font-weight:700;line-height:2.2'>
+<div style='font-size:9px;font-weight:700;line-height:1.8'>
   <div class='row'><span style='color:#333'>Fecha:</span><span class='b'>${fecha}</span></div>
   <div class='row'><span style='color:#333'>Trabajador:</span><span class='b'>${nom}</span></div>
   <div class='row'><span style='color:#333'>Estación:</span><span class='b'>${estacion}</span></div>
-  <div class='row'><span style='color:#333'>Hora cierre:</span><span class='b'>${hora}</span></div>
+  <div class='row'><span style='color:#333'>Hora:</span><span class='b'>${hora}</span></div>
 </div>
 
 <div class='sep2'></div>
@@ -2560,18 +2560,18 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
 
 <!-- ═══ RESUMEN DE CAJA ═══ -->
 <div class='sep2'></div>
-<div class='c b' style='font-size:14px;letter-spacing:2px'>💵 RESUMEN DE CAJA</div>
+<div class='c b' style='font-size:10px;letter-spacing:1.5px'>💵 RESUMEN DE CAJA</div>
 <div class='sep'></div>
-<div style='font-size:13px;font-weight:700;line-height:2.5'>
-  <div class='row'><span style='color:#333'>Ventas mangueras:</span><span class='b'>S/ ${totalMangueras.toFixed(2)}</span></div>
-  <div class='row'><span style='color:#333'>(-) Ventas virtuales:</span><span class='b'>- S/ ${totalVentasVirtuales.toFixed(2)}</span></div>
+<div style='font-size:9px;font-weight:700;line-height:2'>
+  <div class='row'><span style='color:#333'>Mangueras:</span><span class='b'>S/ ${totalMangueras.toFixed(2)}</span></div>
+  <div class='row'><span style='color:#333'>(-) Virtuales:</span><span class='b'>- S/ ${totalVentasVirtuales.toFixed(2)}</span></div>
   <div class='row'><span style='color:#333'>(-) Gastos:</span><span class='b'>- S/ ${totalGastos.toFixed(2)}</span></div>
 </div>
 
 <div class='sep2'></div>
 <div class='summary-box'>
   <div class='c'>
-    <div class='small' style='margin-bottom:2mm'>EFECTIVO QUE DEBE ENTREGAR</div>
+    <div class='small' style='margin-bottom:1.5mm'>ENTREGAR</div>
     <div class='big'>S/ ${efectivoFijo.toFixed(2)}</div>
   </div>
 </div>
