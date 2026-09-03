@@ -3255,13 +3255,12 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
     }
 
     /* ===================== MAIN APP ===================== */
-    function App() {
+    function App({ themeDark, setThemeDark }) {
       const [screen, setScreen] = useState('login');
       const [rol, setRol] = useState('trabajador');
       const [usuario, setUsuario] = useState('');
       const [seccion, setSeccion] = useState('resumen');
       const [estacion, setEstacion] = useState(ESTACIONES[0]);
-      const [themeDark, setThemeDark] = useState(true);
       const [palette, setPalette] = useState(DARK);
       useEffect(() => {
         C = palette;
