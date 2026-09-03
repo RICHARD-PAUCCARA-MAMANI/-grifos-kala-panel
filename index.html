@@ -3262,6 +3262,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
       const [seccion, setSeccion] = useState('resumen');
       const [estacion, setEstacion] = useState(ESTACIONES[0]);
       const [palette, setPalette] = useState(DARK);
+      const isMobile = useIsMobile();
       useEffect(() => {
         C = palette;
         document.body.style.background = palette.bg;
@@ -3302,7 +3303,6 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
         { id: 'vehiculos', label: 'Vehículos', Icon: I.Building2 },
       ];
 
-      const isMobile = useIsMobile();
       return (<div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column' }}>
         {/* TOP BAR */}
         <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: isMobile ? '10px 12px' : '12px 20px' }}>
