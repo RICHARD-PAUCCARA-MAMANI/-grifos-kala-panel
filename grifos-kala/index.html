@@ -55,29 +55,16 @@
     let C = DARK;
 
     /* ===================== DATA ===================== */
-    const PRODUCTOS_COLORS = {
-      diesel: { dark: { color: '#E8A33D', soft: '#3A2E1A' }, light: { color: '#C4841D', soft: '#FDF3E1' } },
-      diesel4: { dark: { color: '#D4A017', soft: '#3A2E1A' }, light: { color: '#B8920F', soft: '#FDF3E1' } },
-      regular: { dark: { color: '#4FB0A6', soft: '#173330' }, light: { color: '#2D8A7E', soft: '#E6F5F3' } },
-      urea: { dark: { color: '#8CAE5E', soft: '#26301A' }, light: { color: '#5A8A2F', soft: '#EDF5E4' } },
-    };
-    const PRODUCTOS_BASE = [
-      { id: 'diesel', nombre: 'Diésel B5', precio: 23.10, unidad: 'gal', tanque: 'D2#1', maquina: 3, mangueras: 2 },
-      { id: 'diesel4', nombre: 'Diésel D-B5', precio: 23.10, unidad: 'gal', tanque: 'D2#3 / D2#4', maquina: 1, mangueras: 2 },
-      { id: 'regular', nombre: 'Gasolina Regular', precio: 19.90, unidad: 'gal', tanque: 'Regular', maquina: 2, mangueras: 2 },
-      { id: 'urea', nombre: 'Urea 32', precio: 2.50, unidad: 'litros', tanque: 'Urea', maquina: 4, mangueras: 1 },
+    const PRODUCTOS = [
+      { id: 'diesel', nombre: 'Diésel B5', precio: 23.10, unidad: 'gal', color: C.amber, soft: C.amberSoft, tanque: 'D2#1', maquina: 3, mangueras: 2 },
+      { id: 'diesel4', nombre: 'Diésel D-B5', precio: 23.10, unidad: 'gal', color: '#D4A017', soft: '#D4A01711', tanque: 'D2#3 / D2#4', maquina: 1, mangueras: 2 },
+      { id: 'regular', nombre: 'Gasolina Regular', precio: 19.90, unidad: 'gal', color: C.teal, soft: C.tealSoft, tanque: 'Regular', maquina: 2, mangueras: 2 },
+      { id: 'urea', nombre: 'Urea 32', precio: 2.50, unidad: 'litros', color: C.green, soft: C.greenSoft, tanque: 'Urea', maquina: 4, mangueras: 1 },
     ];
-    // PRODUCTOS with initial dark-theme colors
-    const PRODUCTOS = PRODUCTOS_BASE.map(p => ({ ...p, ...(PRODUCTOS_COLORS[p.id]?.dark || {}) }));
 
     const ESTACIONES = ['Grifo Kala Arequipa', 'Grifo Kala Juliaca'];
     const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     const METODOS = [
-      { id: 'efectivo', label: 'Efectivo' }, { id: 'tarjeta', label: 'Tarjeta' },
-      { id: 'yape', label: 'Yape' }, { id: 'transferencia', label: 'Transferencia' },
-      { id: 'deposito', label: 'Depósito' },
-    ];
-    const METODOS_WORKER = [
       { id: 'efectivo', label: 'Efectivo' }, { id: 'tarjeta', label: 'Tarjeta' },
       { id: 'yape', label: 'Yape' }, { id: 'transferencia', label: 'Transferencia' },
       { id: 'deposito', label: 'Depósito' },
@@ -90,50 +77,6 @@
       baseUrl: 'https://facturacion.apisperu.com/api/v1',
       token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MTk1MyJ9.2CV52mUCNSAIgyVk7m2O8GBUjeFrDPk9Mvkavm9hD7w',
     };
-
-    /* ===================== FACTILIZA - CONSULTA DNI/RUC ===================== */
-    const FACTILIZA = {
-      baseUrl: 'https://api.factiliza.com/v1',
-      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MTk1MyJ9.2CV52mUCNSAIgyVk7m2O8GBUjeFrDPk9Mvkavm9hD7w',
-    };
-
-    async function consultarRUC(ruc) {
-      try {
-        const response = await fetch(`${FACTILIZA.baseUrl}/ruc/info/${ruc}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${FACTILIZA.token}`,
-            'Accept': 'application/json'
-          }
-        });
-        const result = await response.json();
-        if (result.success && result.data) {
-          return { ok: true, nombre: result.data.nombre_o_razon_social, direccion: result.data.direccion || '', estado: result.data.estado };
-        }
-        return { ok: false, error: result.message || 'No encontrado' };
-      } catch (err) {
-        return { ok: false, error: err.message };
-      }
-    }
-
-    async function consultarDNI(dni) {
-      try {
-        const response = await fetch(`${FACTILIZA.baseUrl}/dni/info/${dni}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${FACTILIZA.token}`,
-            'Accept': 'application/json'
-          }
-        });
-        const result = await response.json();
-        if (result.success && result.data) {
-          return { ok: true, nombre: result.data.nombre_completo };
-        }
-        return { ok: false, error: result.message || 'No encontrado' };
-      } catch (err) {
-        return { ok: false, error: err.message };
-      }
-    }
 
     async function emitirComprobanteElectronico(venta) {
       const esFactura = venta.comp === 'Factura';
@@ -457,8 +400,6 @@
             if (idx >= 0) PRODUCTOS[idx] = { ...PRODUCTOS[idx], precio: nuevoPrecio };
           });
         }
-        // Notificar a Worker en la misma pestaña
-        window.dispatchEvent(new Event('preciosActualizados'));
       }
       return (<div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
         <div><div style={{ fontFamily: "'Inter'", fontSize: 12, color: C.muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Precios vigentes · {estacion}</div>
@@ -606,33 +547,6 @@
       const [dniCliente, setDniCliente] = useState(''); const [nombreCliente, setNombreCliente] = useState('');
       const [placa, setPlaca] = useState('');
       const [metodoPago, setMetodoPago] = useState('transferencia');
-      const [cargandoCliente, setCargandoCliente] = useState(false);
-
-      // Auto-lookup RUC cuando tiene 11 dígitos
-      useEffect(() => {
-        if (tipoComp === 'factura' && ruc.trim().length === 11 && /^\d{11}$/.test(ruc.trim())) {
-          setCargandoCliente(true);
-          consultarRUC(ruc.trim()).then(res => {
-            setCargandoCliente(false);
-            if (res.ok) {
-              setRazonSocial(res.nombre || '');
-            }
-          });
-        }
-      }, [ruc, tipoComp]);
-
-      // Auto-lookup DNI cuando tiene 8 dígitos
-      useEffect(() => {
-        if (tipoComp === 'boleta' && dniCliente.trim().length === 8 && /^\d{8}$/.test(dniCliente.trim())) {
-          setCargandoCliente(true);
-          consultarDNI(dniCliente.trim()).then(res => {
-            setCargandoCliente(false);
-            if (res.ok) {
-              setNombreCliente(res.nombre || '');
-            }
-          });
-        }
-      }, [dniCliente, tipoComp]);
       const [productoId, setProductoId] = useState('diesel');
       const [modo, setModo] = useState('galones');
       const [valor, setValor] = useState('');
@@ -749,7 +663,7 @@
             <div style={{ fontFamily: 'Inter', fontSize: 11.5, color: C.muted }}>Para bancarización de pagos</div>
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Tipo de comprobante</div>
               <div style={{ display: 'flex', gap: 8 }}>{[{ id: 'boleta', label: 'Boleta de Venta', color: C.teal }, { id: 'factura', label: 'Factura', color: C.green }].map(t => (<button key={t.id} onClick={() => setTipoComp(t.id)} type="button" style={{ flex: 1, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', border: `1.5px solid ${tipoComp === t.id ? t.color : C.border}`, background: tipoComp === t.id ? `${t.color}22` : C.bg, color: tipoComp === t.id ? t.color : C.textDim, fontFamily: 'Inter', fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>{t.label}</button>))}</div></div>
-            {tipoComp === 'factura' ? (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase' }}>RUC</div><div style={{ position: 'relative' }}><input placeholder="RUC (11 dígitos)" value={ruc} onChange={e => setRuc(e.target.value)} maxLength={11} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono', paddingRight: cargandoCliente ? 36 : 12 }} />{cargandoCliente && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.amber, fontSize: 12 }}>⏳</div>}</div>{razonSocial && <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.green, padding: '6px 10px', background: C.greenSoft, borderRadius: 6, border: `1px solid ${C.green}33` }}>✅ {razonSocial}</div>}</div>) : (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase' }}>DNI</div><div style={{ position: 'relative' }}><input placeholder="DNI (8 dígitos)" value={dniCliente} onChange={e => setDniCliente(e.target.value)} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono', paddingRight: cargandoCliente ? 36 : 12 }} />{cargandoCliente && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.amber, fontSize: 12 }}>⏳</div>}</div>{nombreCliente && <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.green, padding: '6px 10px', background: C.greenSoft, borderRadius: 6, border: `1px solid ${C.green}33` }}>✅ {nombreCliente}</div>}</div>)}
+            {tipoComp === 'factura' ? (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase' }}>RUC</div><input placeholder="RUC (11 dígitos)" value={ruc} onChange={e => setRuc(e.target.value)} maxLength={11} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>) : (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase' }}>DNI</div><input placeholder="DNI (8 dígitos)" value={dniCliente} onChange={e => setDniCliente(e.target.value)} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>)}
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Placa (opcional)</div><input placeholder="ABC-123" value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono', letterSpacing: 1 }} /></div>
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Producto</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>{productos.map(p => { const sel = p.id === productoId; return (<button key={p.id} onClick={() => setProductoId(p.id)} type="button" style={{ padding: '10px 8px', borderRadius: 8, cursor: 'pointer', textAlign: 'center', border: `1.5px solid ${sel ? p.color : C.border}`, background: sel ? p.soft : C.bg }}><div style={{ fontFamily: 'Inter', fontSize: 12, color: C.text, fontWeight: 500 }}>{p.nombre}</div><div style={{ fontFamily: 'JetBrains Mono', fontSize: 13, color: p.color, fontWeight: 700, marginTop: 2 }}>S/ {p.precio.toFixed(2)}</div></button>); })}</div></div>
@@ -1332,188 +1246,36 @@
     }
 
     /* ===================== ADMIN: REPORTES ===================== */
-    function VehiculosAdmin({ estacion }) {
+    function ReportesAdmin() {
       const isMobile = useIsMobile();
-      const [vehiculos, setVehiculos] = useState(() => {
-        try { const s = localStorage.getItem('grifos_kala_vehiculos'); return s ? JSON.parse(s) : []; } catch { return []; }
-      });
-      const [showForm, setShowForm] = useState(false);
-      const [editId, setEditId] = useState(null);
-      const [form, setForm] = useState({ nombre: '', placa: '', tipo: 'cisterna', estacion: estacion });
-      const [filtroTipo, setFiltroTipo] = useState('todos');
-
-      function guardarVehiculo() {
-        if (!form.nombre.trim() || !form.placa.trim()) return;
-        const data = { ...form, nombre: form.nombre.trim().toUpperCase(), placa: form.placa.trim().toUpperCase(), estacion };
-        let nuevos;
-        if (editId) {
-          nuevos = vehiculos.map(v => v.id === editId ? { ...v, ...data } : v);
-        } else {
-          nuevos = [...vehiculos, { id: Date.now(), ...data, galonesConsumidos: 0, viaticos: 0, reposiciones: 0 }];
-        }
-        setVehiculos(nuevos);
-        localStorage.setItem('grifos_kala_vehiculos', JSON.stringify(nuevos));
-        setForm({ nombre: '', placa: '', tipo: 'cisterna', estacion });
-        setEditId(null);
-        setShowForm(false);
-      }
-
-      function eliminarVehiculo(id) {
-        const nuevos = vehiculos.filter(v => v.id !== id);
-        setVehiculos(nuevos);
-        localStorage.setItem('grifos_kala_vehiculos', JSON.stringify(nuevos));
-      }
-
-      function editarVehiculo(v) {
-        setForm({ nombre: v.nombre, placa: v.placa, tipo: v.tipo, estacion: v.estacion });
-        setEditId(v.id);
-        setShowForm(true);
-      }
-
-      function actualizarCampo(id, campo, valor) {
-        const nuevos = vehiculos.map(v => v.id === id ? { ...v, [campo]: parseFloat(valor) || 0 } : v);
-        setVehiculos(nuevos);
-        localStorage.setItem('grifos_kala_vehiculos', JSON.stringify(nuevos));
-      }
-
-      const filtrados = vehiculos.filter(v => v.estacion === estacion && (filtroTipo === 'todos' || v.tipo === filtroTipo));
-      const totalGalones = filtrados.reduce((s, v) => s + (v.galonesConsumidos || 0), 0);
-      const totalViaticos = filtrados.reduce((s, v) => s + (v.viaticos || 0), 0);
-      const totalReposiciones = filtrados.reduce((s, v) => s + (v.reposiciones || 0), 0);
-
       return (<div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        {/* KPIs */}
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: 12 }}>
-          <KpiCard label="Vehículos" value={filtrados.length} sub={filtroTipo === 'todos' ? 'Todos' : filtroTipo === 'cisterna' ? 'Cisternas' : 'Normales'} color={C.amber} />
-          <KpiCard label="Galones consumidos" value={totalGalones.toLocaleString()} sub="Todos los vehículos" color={C.teal} />
-          <KpiCard label="Viáticos total" value={money(totalViaticos)} sub="Asignados" color={C.green} />
-          <KpiCard label="Reposiciones total" value={money(totalReposiciones)} sub="Reembolsos" color={C.blue} />
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 12 }}>
+          <KpiCard label="Ventas del mes" value={money(247892.50)} sub="↑ 12% vs mes anterior" color={C.amber} />
+          <KpiCard label="Galones totales" value="38,421" sub="Todos los productos" color={C.teal} />
+          <KpiCard label="Ticket promedio" value={money(189.30)} sub="Por transacción" color={C.green} />
         </div>
-
-        {/* Filtros + Agregar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {[{ id: 'todos', label: 'Todos' }, { id: 'cisterna', label: '🛢️ Cisternas' }, { id: 'normal', label: '🚗 Normales' }].map(f => (
-              <button key={f.id} onClick={() => setFiltroTipo(f.id)} type="button" style={{ padding: '7px 14px', borderRadius: 8, border: `1px solid ${filtroTipo === f.id ? C.amber : C.border}`, background: filtroTipo === f.id ? C.amberSoft : C.panel, color: filtroTipo === f.id ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{f.label}</button>
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}><I.TrendingUp size={15} color={C.teal} /><span style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 500, color: C.text }}>Distribución de ventas por producto</span></div>
+          <ResponsiveContainer width="100%" height={250}>
+            <PieChart>
+              <Pie data={[{ name: 'Diésel B5', value: 124500 }, { name: 'Diésel D-B5', value: 78200 }, { name: 'Regular', value: 31900 }, { name: 'Urea', value: 13292 }]} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="value">
+                <Cell fill={C.amber} />
+                <Cell fill="#D4A017" />
+                <Cell fill={C.teal} />
+                <Cell fill={C.green} />
+              </Pie>
+              <Tooltip contentStyle={{ background: C.panelLight, border: `1px solid ${C.border}`, borderRadius: 8, fontFamily: 'Inter', fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
+            {[{ color: C.amber, label: 'Diésel B5' }, { color: '#D4A017', label: 'Diésel D-B5' }, { color: C.teal, label: 'Regular' }, { color: C.green, label: 'Urea' }].map(item => (
+              <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: item.color }} /><span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>{item.label}</span></div>
             ))}
           </div>
-          <button onClick={() => { setShowForm(!showForm); setEditId(null); setForm({ nombre: '', placa: '', tipo: 'cisterna', estacion }); }} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.amber, color: C.bg, border: 'none', borderRadius: 8, padding: '9px 16px', fontFamily: 'Inter', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}><I.Plus size={14} /> Nuevo vehículo</button>
         </div>
-
-        {/* Formulario */}
-        {showForm && (
-          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <div style={{ flex: 1, minWidth: 150 }}>
-              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>Nombre</div>
-              <input placeholder="Ej: Cisterna BFM-914" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />
-            </div>
-            <div style={{ width: 120 }}>
-              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>Placa</div>
-              <input placeholder="ABC-123" value={form.placa} onChange={e => setForm({ ...form, placa: e.target.value.toUpperCase() })} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, textTransform: 'uppercase', boxSizing: 'border-box' }} />
-            </div>
-            <div style={{ width: 130 }}>
-              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>Tipo</div>
-              <select value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, cursor: 'pointer' }}>
-                <option value="cisterna">🛢️ Cisterna</option>
-                <option value="normal">🚗 Normal</option>
-              </select>
-            </div>
-            <button onClick={guardarVehiculo} type="button" style={{ padding: '8px 18px', borderRadius: 8, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>{editId ? 'Actualizar' : 'Guardar'}</button>
-            <button onClick={() => { setShowForm(false); setEditId(null); }} type="button" style={{ padding: '8px 14px', borderRadius: 8, background: 'none', border: `1px solid ${C.border}`, color: C.muted, fontFamily: 'Inter', fontSize: 12, cursor: 'pointer' }}>Cancelar</button>
-          </div>
-        )}
-
-        {/* Lista de vehículos */}
-        {filtrados.length === 0 ? (
-          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 40, textAlign: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🚛</div>
-            <div style={{ fontFamily: 'Inter', fontSize: 14, color: C.muted }}>No hay vehículos registrados</div>
-            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginTop: 4 }}>Agrega cisternas o vehículos normales para llevar control</div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {filtrados.map(v => (
-              <div key={v.id} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: v.tipo === 'cisterna' ? C.amberSoft : C.tealSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{v.tipo === 'cisterna' ? '🛢️' : '🚗'}</div>
-                    <div>
-                      <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 600, color: C.text }}>{v.nombre}</div>
-                      <div style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: C.muted }}>{v.placa} · <span style={{ color: v.tipo === 'cisterna' ? C.amber : C.teal }}>{v.tipo === 'cisterna' ? 'Cisterna' : 'Normal'}</span></div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => editarVehiculo(v)} type="button" style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: C.muted }}><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
-                    <button onClick={() => eliminarVehiculo(v.id)} type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.red, padding: 4 }}><WI.Trash2 size={13} /></button>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 10 }}>
-                  <div style={{ background: C.bg, borderRadius: 8, padding: '10px 12px' }}>
-                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginBottom: 4, textTransform: 'uppercase' }}>Galones consumidos</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <input type="number" step="0.01" min="0" value={v.galonesConsumidos || ''} onChange={e => actualizarCampo(v.id, 'galonesConsumidos', e.target.value)} placeholder="0" style={{ width: 80, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 5, padding: '5px 7px', color: C.amber, fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, textAlign: 'right', boxSizing: 'border-box' }} />
-                      <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>gal</span>
-                    </div>
-                  </div>
-                  <div style={{ background: C.bg, borderRadius: 8, padding: '10px 12px' }}>
-                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginBottom: 4, textTransform: 'uppercase' }}>Viáticos</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: C.green }}>S/</span>
-                      <input type="number" step="0.01" min="0" value={v.viaticos || ''} onChange={e => actualizarCampo(v.id, 'viaticos', e.target.value)} placeholder="0.00" style={{ width: 90, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 5, padding: '5px 7px', color: C.green, fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, textAlign: 'right', boxSizing: 'border-box' }} />
-                    </div>
-                  </div>
-                  <div style={{ background: C.bg, borderRadius: 8, padding: '10px 12px' }}>
-                    <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginBottom: 4, textTransform: 'uppercase' }}>Reposición</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: C.blue }}>S/</span>
-                      <input type="number" step="0.01" min="0" value={v.reposiciones || ''} onChange={e => actualizarCampo(v.id, 'reposiciones', e.target.value)} placeholder="0.00" style={{ width: 90, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 5, padding: '5px 7px', color: C.blue, fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, textAlign: 'right', boxSizing: 'border-box' }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Resumen por tipo */}
-        {filtrados.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 12 }}>
-            <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-              <div style={{ fontFamily: 'Inter', fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 10 }}>🛢️ Resumen Cisternas</div>
-              {vehiculos.filter(v => v.tipo === 'cisterna' && v.estacion === estacion).length === 0 ? (
-                <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Sin cisternas</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {vehiculos.filter(v => v.tipo === 'cisterna' && v.estacion === estacion).map(v => (
-                    <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: C.bg, borderRadius: 6 }}>
-                      <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim }}>{v.placa}</span>
-                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, fontWeight: 700, color: C.amber }}>{(v.galonesConsumidos || 0).toLocaleString()} gal</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-              <div style={{ fontFamily: 'Inter', fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 10 }}>🚗 Resumen Vehículos Normales</div>
-              {vehiculos.filter(v => v.tipo === 'normal' && v.estacion === estacion).length === 0 ? (
-                <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Sin vehículos normales</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {vehiculos.filter(v => v.tipo === 'normal' && v.estacion === estacion).map(v => (
-                    <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: C.bg, borderRadius: 6 }}>
-                      <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim }}>{v.placa}</span>
-                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, fontWeight: 700, color: C.teal }}>{(v.galonesConsumidos || 0).toLocaleString()} gal</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         <div style={{ background: C.tealSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, display: 'flex', gap: 10 }}>
-          <I.ShieldCheck size={16} color={C.teal} style={{ flexShrink: 0, marginTop: 2 }} />
-          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim, lineHeight: 1.6 }}>Registra el consumo de galones, viáticos y reposiciones por vehículo. Los datos se guardan automáticamente y se filtran por estación.</div>
+          <I.FileOutput size={16} color={C.teal} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim, lineHeight: 1.6 }}>Los reportes se actualizan en tiempo real. Puedes exportar datos en formato <b>Excel</b> o <b>PDF</b> desde la sección de configuración.</div>
         </div>
       </div>);
     }
@@ -1544,35 +1306,6 @@
     /* ===================== WORKER: NUEVA VENTA ===================== */
     function WorkerNuevaVenta({ usuario, estacion, ventasWorker, setVentasWorker }) {
       const isMobile = useIsMobile();
-
-      const [precioTick, setPrecioTick] = useState(0);
-      // Sincronizar precios desde localStorage (actualizados por Admin)
-      useEffect(() => {
-        function sincronizarPrecios() {
-          try {
-            const s = localStorage.getItem('grifos_kala_precios');
-            if (s) {
-              const precios = JSON.parse(s);
-              const mapaIds = { diesel: ['diesel', 'diesel4'], regular: ['regular'], urea: ['urea'] };
-              Object.entries(precios).forEach(([grupoId, precio]) => {
-                (mapaIds[grupoId] || []).forEach(pid => {
-                  const idx = PRODUCTOS.findIndex(p => p.id === pid);
-                  if (idx >= 0 && precio > 0) PRODUCTOS[idx] = { ...PRODUCTOS[idx], precio };
-                });
-              });
-              setPrecioTick(t => t + 1);
-            }
-          } catch {}
-        }
-        sincronizarPrecios();
-        window.addEventListener('preciosActualizados', sincronizarPrecios);
-        window.addEventListener('storage', sincronizarPrecios);
-        return () => {
-          window.removeEventListener('preciosActualizados', sincronizarPrecios);
-          window.removeEventListener('storage', sincronizarPrecios);
-        };
-      }, []);
-
       const [productoId, setProductoId] = useState(PRODUCTOS[0].id);
       const [cantidad, setCantidad] = useState('');
       const [porSoles, setPorSoles] = useState(false);
@@ -1584,28 +1317,6 @@
       const [clienteDoc, setClienteDoc] = useState('');
       const [clienteDireccion, setClienteDireccion] = useState('');
       const [clientePlaca, setClientePlaca] = useState('');
-      const [cargandoCliente, setCargandoCliente] = useState(false);
-
-      // Auto-lookup DNI/RUC cuando cambia el documento
-      useEffect(() => {
-        const doc = clienteDoc.trim();
-        if (tipoComprobante === 'Factura' && doc.length === 11 && /^\d{11}$/.test(doc)) {
-          setCargandoCliente(true);
-          consultarRUC(doc).then(res => {
-            setCargandoCliente(false);
-            if (res.ok) {
-              setClienteNombre(res.nombre || '');
-              setClienteDireccion(res.direccion || '');
-            }
-          });
-        } else if (tipoComprobante === 'Boleta' && doc.length === 8 && /^\d{8}$/.test(doc)) {
-          setCargandoCliente(true);
-          consultarDNI(doc).then(res => {
-            setCargandoCliente(false);
-            if (res.ok) setClienteNombre(res.nombre || '');
-          });
-        }
-      }, [clienteDoc, tipoComprobante]);
 
       const METODOS_PAGO = [
         { id: 'efectivo', label: 'Efectivo', icon: WI.Banknote, color: C.green },
@@ -1613,6 +1324,12 @@
         { id: 'yape', label: 'Yape', icon: WI.Smartphone, color: '#7B2D8E' },
         { id: 'transferencia', label: 'Transferencia', icon: WI.ArrowLeftRight, color: C.blue },
         { id: 'deposito', label: 'Depósito', icon: WI.FileText, color: C.amber },
+      ];
+
+      const METODOS_WORKER = [
+        { id: 'efectivo', label: 'Efectivo' }, { id: 'tarjeta', label: 'Tarjeta' },
+        { id: 'yape', label: 'Yape' }, { id: 'transferencia', label: 'Transferencia' },
+        { id: 'deposito', label: 'Depósito' },
       ];
 
       const producto = PRODUCTOS.find(p => p.id === productoId);
@@ -1644,127 +1361,38 @@
       }
 
       function imprimirComprobante(ventaRegistrada) {
-        const w = window.open('', '_blank', 'width=320,height=800');
+        const w = window.open('', '_blank', 'width=400,height=700');
         const now = new Date();
         const fecha = now.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
         const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
-        const esFactura = ventaRegistrada.comp === 'Factura';
-        const sub = (ventaRegistrada.total / 1.18);
-        const igv = (ventaRegistrada.total - sub);
-
         let itemsHtml = '';
         ventaRegistrada.items.forEach(it => {
-          itemsHtml += `<tr style='border-bottom:1px dotted #ddd'>
-            <td style='padding:2mm 0;font-weight:600;font-size:10.5px'>${it.producto}</td>
-            <td style='padding:2mm 0;text-align:right;font-weight:700;white-space:nowrap'>S/ ${it.total.toFixed(2)}</td>
-          </tr>
-          <tr style='border-bottom:none'>
-            <td style='padding:0 0 2mm 2mm;font-size:9px;color:#555;font-weight:500' colspan='2'>${parseFloat(it.cant).toFixed(2)} ${it.unidad || 'gal'} x S/ ${it.precioUnitario.toFixed(2)}</td>
-          </tr>`;
+          itemsHtml += `<tr><td style='padding:3px 4px;font-size:11px'>1</td><td style='padding:3px 4px;font-size:11px'>${it.unidad || 'GLL'}</td><td style='padding:3px 4px;font-size:11px'>${it.producto}</td><td style='padding:3px 4px;font-size:11px;text-align:right'>${it.precioUnitario.toFixed(2)}</td><td style='padding:3px 4px;font-size:11px;text-align:right'>${it.total.toFixed(2)}</td></tr>`;
         });
-
-        w.document.write(`<!DOCTYPE html><html><head><meta charset='utf-8'><title>Comprobante</title>
-<style>
-  @page { size: 80mm auto; margin: 2mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', 'Lucida Console', monospace; padding: 4mm; width: 72mm; font-size: 12px; font-weight: 600; color: #000; background: #fff; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .c { text-align: center; }
-  .b { font-weight: 700; }
-  .sep { border-top: 1px dashed #000; margin: 2.5mm 0; }
-  .sep2 { border-top: 2.5px solid #000; margin: 2mm 0; }
-  .sep3 { border-top: 1px solid #ccc; margin: 2mm 0; }
-  .row { display: flex; justify-content: space-between; align-items: baseline; }
-  .small { font-size: 9px; color: #666; }
-  .big { font-size: 18px; font-weight: 700; }
-  .total-box { border: 2px solid #000; padding: 2.5mm 3mm; margin: 2.5mm 0; }
-  .total-row { font-size: 15px; font-weight: 700; }
-  table { width: 100%; border-collapse: collapse; }
-  td { padding: 1px 0; font-size: 11px; font-weight: 600; }
-  .th { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #555; border-bottom: 1.5px solid #000; padding: 1mm 0; }
-  .cut { border-top: 2px dashed #000; margin-top: 4mm; padding-top: 3mm; text-align: center; font-size: 9px; color: #999; }
-  @media print { body { padding: 2mm; width: 76mm; } }
-</style></head><body>
-
-<!-- ═══ ENCABEZADO ═══ -->
-<div class='c'>
-  <div style='font-size:20px;font-weight:700;letter-spacing:2px'>⛽ GRIFOS KALA</div>
-  <div style='font-size:9px;font-weight:500;margin-top:1.5mm;color:#444'>${EMPRESA.razonSocial}</div>
-  <div style='font-size:9px;font-weight:500;color:#444'>RUC: ${EMPRESA.ruc}</div>
-  <div style='font-size:9px;font-weight:500;color:#444'>${EMPRESA.direccion}</div>
-  <div style='font-size:9px;font-weight:500;color:#444'>${EMPRESA.distrito} · Tel: ${EMPRESA.telefono}</div>
-</div>
-
-<div class='sep2'></div>
-
-<!-- ═══ TIPO DE COMPROBANTE ═══ -->
-<div class='c'>
-  <div style='font-size:15px;font-weight:700;letter-spacing:2px;border:1.5px solid #000;display:inline-block;padding:1.5mm 4mm;margin:1mm 0'>${esFactura ? 'FACTURA' : 'BOLETA'} DE VENTA</div>
-  <div style='font-size:11px;font-weight:700;margin-top:1.5mm'>N° ${ventaRegistrada.serie}</div>
-</div>
-
-<div class='sep2'></div>
-
-<!-- ═══ DATOS DEL CLIENTE ═══ -->
-<div style='margin-bottom:2mm'>
-  <div style='font-size:8.5px;font-weight:700;letter-spacing:1px;color:#555;margin-bottom:1.5mm'>DATOS DEL CLIENTE</div>
-  <div style='font-size:10.5px;font-weight:600;line-height:1.8'>
-    <div class='row'><span style='color:#555'>Cliente:</span><span class='b'>${ventaRegistrada.clienteNombre || 'CLIENTE VARIOS'}</span></div>
-    <div class='row'><span style='color:#555'>${esFactura ? 'RUC' : 'DNI'}:</span><span>${ventaRegistrada.clienteDoc || '---'}</span></div>
-    ${ventaRegistrada.clienteDireccion ? `<div class='row'><span style='color:#555'>Dirección:</span><span>${ventaRegistrada.clienteDireccion}</span></div>` : ''}
-    ${ventaRegistrada.clientePlaca ? `<div class='row'><span style='color:#555'>Placa:</span><span class='b'>${ventaRegistrada.clientePlaca}</span></div>` : ''}
-  </div>
-</div>
-
-<div class='sep3'></div>
-
-<!-- ═══ FECHA Y HORA ═══ -->
-<div class='row' style='font-size:10.5px;font-weight:600'>
-  <span style='color:#555'>Fecha:</span><span>${fecha}</span>
-</div>
-<div class='row' style='font-size:10.5px;font-weight:600'>
-  <span style='color:#555'>Hora:</span><span>${hora}</span>
-</div>
-
-<div class='sep'></div>
-
-<!-- ═══ DETALLE DE PRODUCTOS ═══ -->
-<div style='font-size:8.5px;font-weight:700;letter-spacing:1px;color:#555;margin-bottom:2mm'>DETALLE DE PRODUCTOS</div>
-<table>
-  <thead><tr><th class='th' style='text-align:left'>Descripción</th><th class='th' style='text-align:right;width:24mm'>Total</th></tr></thead>
-  <tbody>${itemsHtml}</tbody>
-</table>
-
-<div class='sep'></div>
-
-<!-- ═══ TOTALES ═══ -->
-${esFactura ? `<div style='margin-bottom:1.5mm'>
-  <div class='row' style='font-size:10.5px;font-weight:500'><span style='color:#555'>Base imponible:</span><span>S/ ${sub.toFixed(2)}</span></div>
-  <div class='row' style='font-size:10.5px;font-weight:500'><span style='color:#555'>IGV (18%):</span><span>S/ ${igv.toFixed(2)}</span></div>
-</div>` : ''}
-<div class='total-box'>
-  <div class='row total-row'><span>TOTAL A PAGAR</span><span>S/ ${ventaRegistrada.total.toFixed(2)}</span></div>
-</div>
-<div style='font-size:9.5px;font-weight:500;margin:2mm 0;color:#333;line-height:1.5'>Son: <b>${numeroALetras(ventaRegistrada.total)}</b></div>
-
-<div class='sep'></div>
-
-<!-- ═══ FORMA DE PAGO ═══ -->
-<div style='margin-bottom:2mm'>
-  <div style='font-size:8.5px;font-weight:700;letter-spacing:1px;color:#555;margin-bottom:1.5mm'>FORMA DE PAGO</div>
-  <div style='font-size:10.5px;font-weight:600;line-height:1.8'>
-    <div class='row'><span style='color:#555'>Medio de pago:</span><span class='b'>${ventaRegistrada.metodo}</span></div>
-    <div class='row'><span style='color:#555'>Atendido por:</span><span>${ventaRegistrada.trabajador}</span></div>
-  </div>
-</div>
-
-<div class='sep'></div>
-
-<!-- ═══ PIE ═══ -->
-<div class='c small' style='line-height:1.6'>Representación impresa de la ${esFactura ? 'factura' : 'boleta'}<br>electrónica</div>
-<div class='c' style='margin-top:4mm;font-size:12px;font-weight:700;letter-spacing:0.5px'>¡GRACIAS POR SU PREFERENCIA!</div>
-
-<div class='cut'>- - - - - - - - - - - - - - - - - - - -</div>
-
+        const esFactura = ventaRegistrada.comp === 'Factura';
+        w.document.write(`<!DOCTYPE html><html><head><meta charset='utf-8'><title>Comprobante</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Courier New',monospace;padding:12px;width:280px;font-size:11px;color:#000;background:#fff}.center{text-align:center}.line{border-top:1px dashed #000;margin:4px 0}.total{font-size:14px;font-weight:700;margin:6px 0}.small{font-size:9px;color:#555}@media print{body{padding:5px}}</style></head><body>
+<div class='center'><div style='font-size:16px;font-weight:700'>⛽ GRIFOS KALA</div><div style='font-size:9px'>${EMPRESA.razonSocial}</div><div style='font-size:9px'>RUC: ${EMPRESA.ruc}</div><div style='font-size:9px'>${EMPRESA.direccion}</div><div style='font-size:9px'>${EMPRESA.distrito} - Tel: ${EMPRESA.telefono}</div></div>
+<div class='line'></div>
+<div class='center' style='font-size:10px;font-weight:700'>${esFactura ? 'FACTURA' : 'BOLETA'} DE VENTA</div>
+<div class='center' style='font-size:10px'>Serie: ${ventaRegistrada.serie}</div>
+<div class='line'></div>
+<div style='font-size:10px'>Cliente: ${ventaRegistrada.clienteNombre || 'Cliente Varios'}</div>
+<div style='font-size:10px'>DNI/RUC: ${ventaRegistrada.clienteDoc || '---'}</div>
+${ventaRegistrada.clienteDireccion ? '<div style="font-size:10px">Dir: ' + ventaRegistrada.clienteDireccion + '</div>' : ''}
+<div style='font-size:10px'>Fecha: ${fecha}  Hora: ${hora}</div>
+${ventaRegistrada.clientePlaca ? '<div style="font-size:10px">Placa: ' + ventaRegistrada.clientePlaca + '</div>' : ''}
+<div class='line'></div>
+<table style='width:100%;border-collapse:collapse'><thead><tr style='border-bottom:1px solid #000'><th style='padding:3px 4px;font-size:9px;text-align:left'>CANT</th><th style='padding:3px 4px;font-size:9px;text-align:left'>UM</th><th style='padding:3px 4px;font-size:9px;text-align:left'>DESCRIPCIÓN</th><th style='padding:3px 4px;font-size:9px;text-align:right'>P/U</th><th style='padding:3px 4px;font-size:9px;text-align:right'>TOTAL</th></tr></thead><tbody>${itemsHtml}</tbody></table>
+<div class='line'></div>
+${esFactura ? '<div style="display:flex;justify-content:space-between;font-size:10px"><span>Gravada:</span><span>S/ ' + (totalGeneral / 1.18).toFixed(2) + '</span></div><div style="display:flex;justify-content:space-between;font-size:10px"><span>IGV (18%):</span><span>S/ ' + (totalGeneral - totalGeneral / 1.18).toFixed(2) + '</span></div>' : ''}
+<div class='total' style='display:flex;justify-content:space-between;border-top:2px solid #000;padding-top:4px'><span>TOTAL:</span><span>S/ ${totalGeneral.toFixed(2)}</span></div>
+<div style='font-size:9px;margin:4px 0'>Son: ${numeroALetras(totalGeneral)}</div>
+<div class='line'></div>
+<div style='font-size:10px'>Pago: ${ventaRegistrada.metodo}</div>
+<div style='font-size:10px'>Atendido por: ${ventaRegistrada.trabajador}</div>
+<div class='line'></div>
+<div class='center small'>Representación impresa de la ${esFactura ? 'factura' : 'boleta'} electrónica</div>
+<div class='center' style='margin-top:8px;font-size:10px;font-weight:700'>¡Gracias por su preferencia!</div>
 </body></html>`);
         w.document.close();
         setTimeout(() => { w.print(); }, 500);
@@ -1804,8 +1432,8 @@ ${esFactura ? `<div style='margin-bottom:1.5mm'>
         {/* 1. SELECCIONAR PRODUCTO */}
         <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
           <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>1. Selecciona el producto</div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 8 }}>
-            {PRODUCTOS.filter(p => p.id !== 'diesel4').map(p => (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 8 }}>
+            {PRODUCTOS.map(p => (
               <button key={p.id} onClick={() => setProductoId(p.id)} type="button" style={{ padding: '12px 10px', borderRadius: 10, border: `2px solid ${productoId === p.id ? p.color : C.border}`, background: productoId === p.id ? p.soft : C.panel, cursor: 'pointer', textAlign: 'center' }}>
                 <div style={{ fontFamily: 'Oswald', fontSize: 13, fontWeight: 600, color: productoId === p.id ? p.color : C.textDim, textTransform: 'uppercase' }}>{p.nombre}</div>
                 <div style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: p.color, marginTop: 4 }}>S/ {p.precio.toFixed(2)}</div>
@@ -1876,8 +1504,8 @@ ${esFactura ? `<div style='margin-bottom:1.5mm'>
           {/* Datos del cliente */}
           <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Datos del cliente</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 8 }}>
-            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Nombre / Razón Social</div><input placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />{clienteNombre && <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.green, marginTop: 3 }}>✅ Auto-detectado</div>}</div>
-            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>{tipoComprobante === 'Factura' ? 'RUC' : 'DNI'}</div><div style={{ position: 'relative' }}><input placeholder={tipoComprobante === 'Factura' ? 'RUC (11 dígitos)' : 'DNI (8 dígitos)'} value={clienteDoc} onChange={e => setClienteDoc(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', paddingRight: cargandoCliente ? 32 : 10, color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} />{cargandoCliente && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.amber, fontSize: 11 }}>⏳</div>}</div></div>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Nombre / Razón Social</div><input placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} /></div>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>{tipoComprobante === 'Factura' ? 'RUC' : 'DNI'}</div><input placeholder={tipoComprobante === 'Factura' ? 'RUC (11 dígitos)' : 'DNI (8 dígitos)'} value={clienteDoc} onChange={e => setClienteDoc(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} /></div>
             {tipoComprobante === 'Factura' && <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Dirección</div><input placeholder="Dirección fiscal" value={clienteDireccion} onChange={e => setClienteDireccion(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} /></div>}
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Placa (opcional)</div><input placeholder="ABC-123" value={clientePlaca} onChange={e => setClientePlaca(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} /></div>
           </div>
@@ -1951,34 +1579,23 @@ ${esFactura ? `<div style='margin-bottom:1.5mm'>
 
       const productosVisibles = useMemo(() => {
         if (maquinasSeleccionadas.length === 0) return [];
-        const mapaProductoTanques = {}; // { productoId: Set de nombres de tanque }
+        const pIds = new Set();
         maquinasSeleccionadas.forEach(mId => {
           const m = maquinasDisponibles.find(mm => mm.id === mId);
           if (!m) return;
-          const pid = m.productoId || ((m.isla || '').toLowerCase().includes('d2#3') || (m.isla || '').toLowerCase().includes('d2#4') ? 'diesel4' : (m.isla || '').toLowerCase().includes('d2#1') ? 'diesel' : (m.isla || '').toLowerCase().includes('regular') ? 'regular' : (m.isla || '').toLowerCase().includes('urea') ? 'urea' : null);
-          if (!pid) return;
-          if (!mapaProductoTanques[pid]) mapaProductoTanques[pid] = new Set();
-          // Extraer el nombre del tanque del campo isla (ej: 'Tanques D2#3 y D2#4' → 'D2#3', 'D2#4')
-          const isla = m.isla || '';
-          const tanquesMatch = isla.match(/D2#\d+|Regular|Urea/gi);
-          if (tanquesMatch) {
-            tanquesMatch.forEach(t => mapaProductoTanques[pid].add(t.toUpperCase()));
-          }
+          if (m.productoId) { pIds.add(m.productoId); return; }
+          const isla = (m.isla || '').toLowerCase();
+          if (isla.includes('d2#3') || isla.includes('d2#4')) { pIds.add('diesel4'); return; }
+          if (isla.includes('d2#1')) { pIds.add('diesel'); return; }
+          if (isla.includes('regular')) { pIds.add('regular'); return; }
+          if (isla.includes('urea')) { pIds.add('urea'); return; }
         });
-        const pIds = Object.keys(mapaProductoTanques);
-        if (pIds.length === 0) return [];
-        return PRODUCTOS.filter(p => pIds.includes(p.id)).map(p => ({
-          ...p,
-          tanques: Array.from(mapaProductoTanques[p.id] || []).join(', ') || '—'
-        }));
+        if (pIds.size === 0) return [];
+        return PRODUCTOS.filter(p => pIds.has(p.id));
       }, [maquinasSeleccionadas, maquinasDisponibles]);
 
-      // Total mangueras = TODAS las ventas (efectivo + virtuales)
-      const totalMangueras = ventasWorker.reduce((sum, v) => sum + v.total, 0);
-      const totalGalonesMangueras = ventasWorker.reduce((sum, v) => {
-        const gal = parseFloat(v.cant) || 0;
-        return sum + gal;
-      }, 0);
+      const totalMangueras = productosVisibles.reduce((sum, p) => sum + calcularMontoProducto(p.id), 0);
+      const totalGalonesMangueras = productosVisibles.reduce((sum, p) => sum + calcularGalones(p.id), 0);
 
       // Ventas virtuales (no efectivo)
       const [ventasVirtuales, setVentasVirtuales] = useState(() =>
@@ -2004,27 +1621,16 @@ ${esFactura ? `<div style='margin-bottom:1.5mm'>
 
       // Gastos de turno
       const [gastos, setGastos] = useState([
-        { id: 1, concepto: 'Consumo grifo BFM-914', monto: '', tipo: 'soles', productoId: 'diesel' },
-        { id: 2, concepto: 'Viáticos y Peajes BFM-96Y', monto: '', tipo: 'soles', productoId: 'regular' },
-        { id: 3, concepto: 'Pago externo', monto: '', tipo: 'soles', productoId: 'regular' },
+        { id: 1, concepto: 'Consumo grifo BFM-914', monto: '' },
+        { id: 2, concepto: 'Viáticos y Peajes BFM-96Y', monto: '' },
+        { id: 3, concepto: 'Pago externo', monto: '' },
       ]);
       const [nuevoGastoConcepto, setNuevoGastoConcepto] = useState('');
       const [nuevoGastoMonto, setNuevoGastoMonto] = useState('');
-      const [nuevoGastoTipo, setNuevoGastoTipo] = useState('soles');
-      const [nuevoGastoProducto, setNuevoGastoProducto] = useState('diesel');
-
-      function calcularMontoGasto(g) {
-        const monto = parseFloat(g.monto) || 0;
-        if (g.tipo === 'galones') {
-          const p = PRODUCTOS.find(pp => pp.id === g.productoId);
-          return monto * (p ? p.precio : 0);
-        }
-        return monto;
-      }
 
       function agregarGasto() {
         if (!nuevoGastoConcepto.trim() || !nuevoGastoMonto) return;
-        setGastos(prev => [...prev, { id: Date.now(), concepto: nuevoGastoConcepto.trim(), monto: nuevoGastoMonto, tipo: nuevoGastoTipo, productoId: nuevoGastoProducto }]);
+        setGastos(prev => [...prev, { id: Date.now(), concepto: nuevoGastoConcepto.trim(), monto: nuevoGastoMonto }]);
         setNuevoGastoConcepto('');
         setNuevoGastoMonto('');
       }
@@ -2037,7 +1643,7 @@ ${esFactura ? `<div style='margin-bottom:1.5mm'>
         setGastos(prev => prev.map(g => g.id === id ? { ...g, [campo]: valor } : g));
       }
 
-      const totalGastos = gastos.reduce((sum, g) => sum + calcularMontoGasto(g), 0);
+      const totalGastos = gastos.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0);
       const totalVentasVirtuales = ventasVirtuales.reduce((a, v) => a + v.total, 0);
       const efectivoFijo = totalMangueras - totalVentasVirtuales - totalGastos;
 
@@ -2052,18 +1658,15 @@ ${esFactura ? `<div style='margin-bottom:1.5mm'>
         { id: 'deposito', label: 'Depósito', color: C.green },
       ];
 
-      function imprimirCierreTurno(tipo) {
-        // Térmica: selecciona 'basic 230' | A4: selecciona 'epson l3250 series'
-        // El navegador recuerda la impresora por cada ventana popup
-        const w = window.open('', '_blank', tipo === 'a4' ? 'width=900,height=1100' : 'width=320,height=1200');
+      function imprimirCierreTurno() {
+        const w = window.open('', '_blank', 'width=800,height=900');
         const now = new Date();
         const fecha = now.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit' });
         const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
         const nom = trabajador ? trabajador.nombre : usuario;
 
-        // Build product rows (shared)
+        // Build product rows
         let productRows = '';
-        let productRowsA4 = '';
         productosVisibles.forEach(p => {
           const galones = calcularGalones(p.id);
           const monto = calcularMontoProducto(p.id);
@@ -2072,278 +1675,108 @@ ${esFactura ? `<div style='margin-bottom:1.5mm'>
             const ant = parseFloat(r.anterior) || 0;
             const act = parseFloat(r.actual) || 0;
             const gal = Math.max(0, act - ant);
-            productRows += `<tr><td style='padding:1.5mm 0;font-weight:700' rowspan='${idx === 0 ? lecturasProd.length : 0}'>${idx === 0 ? p.nombre.substring(0,14) : ''}</td><td style='padding:1.5mm 0;text-align:right;font-weight:600'>${ant.toFixed(2)}</td><td style='padding:1.5mm 0;text-align:right;font-weight:600'>${act.toFixed(2)}</td><td style='padding:1.5mm 0;text-align:right;font-weight:700'>${gal.toFixed(2)}</td></tr>`;
-            productRowsA4 += `<tr><td style='padding:3px 6px;font-weight:600' rowspan='${idx === 0 ? lecturasProd.length : 0}'>${idx === 0 ? p.nombre : ''}</td><td style='padding:3px 6px;text-align:right'>${ant.toFixed(2)}</td><td style='padding:3px 6px;text-align:right'>${act.toFixed(2)}</td><td style='padding:3px 6px;text-align:right;font-weight:700'>${gal.toFixed(2)}</td></tr>`;
+            productRows += `<tr><td style='padding:3px 6px;font-weight:600;color:#555' rowspan='${idx === 0 ? lecturasProd.length : 0}'>${idx === 0 ? p.nombre : ''}</td><td style='padding:3px 8px;font-family:monospace;text-align:right'>${ant.toFixed(3)}</td><td style='padding:3px 8px;font-family:monospace;text-align:right'>${act.toFixed(3)}</td><td style='padding:3px 8px;font-family:monospace;text-align:right;font-weight:700'>${gal.toFixed(2)}</td></tr>`;
           });
           if (lecturasProd.length > 0) {
-            productRows += `<tr style='border-top:1.5px solid #000'><td colspan='3' style='padding:2.5mm 0;text-align:right;font-weight:700'>TOTAL ${p.nombre.substring(0,14)}</td><td style='padding:2.5mm 0;text-align:right;font-weight:700'>${galones.toFixed(2)} ${p.unidad}</td></tr>`;
-            productRows += `<tr><td colspan='3' style='padding:1.5mm 0;text-align:right;color:#555;font-size:9px;font-weight:600'>${galones.toFixed(2)} x S/ ${p.precio.toFixed(2)}</td><td style='padding:1.5mm 0;text-align:right;font-weight:700'>S/ ${monto.toFixed(2)}</td></tr>`;
-            productRowsA4 += `<tr style='background:#f9f9f6'><td colspan='3' style='padding:4px 6px;text-align:right;font-weight:700'>TOTAL ${p.nombre}</td><td style='padding:4px 6px;text-align:right;font-weight:700'>${galones.toFixed(2)} ${p.unidad}</td></tr>`;
-            productRowsA4 += `<tr><td colspan='3' style='padding:2px 6px;text-align:right;color:#888;font-size:9px'>${galones.toFixed(2)} x S/ ${p.precio.toFixed(2)}</td><td style='padding:2px 6px;text-align:right;font-weight:700'>S/ ${monto.toFixed(2)}</td></tr>`;
+            productRows += `<tr style='background:#f5f5f0'><td colspan='3' style='padding:4px 8px;text-align:right;font-weight:700'>Total ${p.nombre}</td><td style='padding:4px 8px;text-align:right;font-family:monospace;font-weight:700;color:#C4841D'>${galones.toFixed(2)} ${p.unidad}</td></tr>`;
+            productRows += `<tr><td colspan='3' style='padding:2px 8px;text-align:right;color:#888'>${galones.toFixed(2)} × S/ ${p.precio.toFixed(2)}</td><td style='padding:2px 8px;text-align:right;font-family:monospace;font-weight:700;color:#C4841D'>S/ ${monto.toFixed(2)}</td></tr>`;
           }
         });
 
         // Build virtual sales rows
         let virtualRows = '';
-        let virtualRowsA4 = '';
         ventasVirtuales.forEach(v => {
-          virtualRows += `<tr><td style='padding:1.5mm 0;font-weight:600'>${v.producto} (${v.metodo})</td><td style='padding:1.5mm 0;text-align:right;font-weight:600'>${v.cant}</td><td style='padding:1.5mm 0;text-align:right;font-weight:700'>S/ ${v.total.toFixed(2)}</td></tr>`;
-          virtualRowsA4 += `<tr><td style='padding:3px 6px;font-weight:500'>${v.producto}</td><td style='padding:3px 6px;text-align:center'><span style='background:#7B2D8E22;color:#7B2D8E;padding:1px 6px;border-radius:3px;font-size:9px'>${v.metodo}</span></td><td style='padding:3px 6px;text-align:right'>${v.cant}</td><td style='padding:3px 6px;text-align:right;font-weight:700'>S/ ${v.total.toFixed(2)}</td></tr>`;
+          virtualRows += `<tr><td style='padding:3px 8px'>${v.producto}</td><td style='padding:3px 8px;text-align:right'>${v.cant}</td><td style='padding:3px 8px;text-align:center'><span style='background:#7B2D8E22;color:#7B2D8E;padding:1px 6px;border-radius:4px;font-size:11px'>${v.metodo}</span></td><td style='padding:3px 8px;text-align:right;font-family:monospace;font-weight:600'>S/ ${v.total.toFixed(2)}</td></tr>`;
         });
 
         // Build gastos rows
         let gastosRows = '';
-        let gastosRowsA4 = '';
         gastos.forEach(g => {
           if (g.monto && parseFloat(g.monto) > 0) {
-            gastosRows += `<tr><td style='padding:1.5mm 0;font-weight:600'>${g.concepto}</td><td style='padding:1.5mm 0;text-align:right;font-weight:700'>- S/ ${parseFloat(g.monto).toFixed(2)}</td></tr>`;
-            gastosRowsA4 += `<tr><td style='padding:3px 6px'>${g.concepto}</td><td style='padding:3px 6px;text-align:right;font-weight:600;color:#C0392B'>- S/ ${parseFloat(g.monto).toFixed(2)}</td></tr>`;
+            gastosRows += `<tr><td style='padding:3px 8px'>${g.concepto}</td><td style='padding:3px 8px;text-align:right;font-family:monospace;font-weight:600;color:#C0392B'>- S/ ${parseFloat(g.monto).toFixed(2)}</td></tr>`;
           }
         });
 
         // Build varillado rows
         let varilladoRows = '';
-        let varilladoRowsA4 = '';
         productosVisibles.forEach(p => {
           if (varillado[p.id]) {
-            varilladoRows += `<tr><td style='padding:1.5mm 0;font-weight:600'>${p.nombre}</td><td style='padding:1.5mm 0;text-align:right;font-weight:600'>${varillado[p.id]} cm</td></tr>`;
-            varilladoRowsA4 += `<tr><td style='padding:3px 6px'>${p.nombre}</td><td style='padding:3px 6px;text-align:right'>${varillado[p.id]} cm</td></tr>`;
+            varilladoRows += `<tr><td style='padding:3px 8px'>${p.nombre}</td><td style='padding:3px 8px;text-align:right;font-family:monospace'>${varillado[p.id]} cm</td></tr>`;
           }
         });
 
-
-
-        const isA4 = tipo === 'a4';
-
-        if (isA4) {
-          // ============ A4 FORMAT — REPORTE DE CIERRE DE TURNO ============
-          w.document.write(`
+        w.document.write(`
 <!DOCTYPE html>
 <html><head><meta charset='utf-8'><title>Cierre de Turno - ${nom}</title>
 <style>
-  @page { size: A4; margin: 14mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; color: #1a1a1a; background: #fff; font-size: 10.5px; line-height: 1.4; padding: 14mm; }
-  .hdr { text-align: center; border-bottom: 3px solid #C4841D; padding-bottom: 10px; margin-bottom: 14px; }
-  .hdr h1 { font-size: 22px; color: #C4841D; letter-spacing: 3px; font-weight: 800; }
-  .hdr .sub { font-size: 12px; color: #888; margin-top: 3px; font-weight: 600; }
-  .meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; background: linear-gradient(135deg, #faf8f2, #f5f3ec); padding: 12px 16px; border-radius: 8px; border: 1px solid #e8e4da; }
-  .meta div { display: flex; flex-direction: column; gap: 2px; }
-  .meta .lbl { font-size: 8px; color: #999; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
-  .meta .val { font-weight: 700; color: #1a1a1a; font-size: 12px; }
-  .section-title { font-size: 11px; color: #C4841D; margin: 14px 0 8px; font-weight: 700; letter-spacing: 0.8px; display: flex; align-items: center; gap: 6px; }
-  .section-title::after { content: ''; flex: 1; height: 1px; background: #e8e4da; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10px; }
-  th { background: #f8f6f0; padding: 6px 8px; text-align: left; font-weight: 700; border-bottom: 2px solid #d4d0c8; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #888; }
-  td { border-bottom: 1px solid #f0ede6; padding: 5px 8px; }
-  tr:hover td { background: #fdfcfa; }
-  .tr td { background: #f8f6f0; font-weight: 700; border-top: 2px solid #C4841D; border-bottom: 2px solid #C4841D; padding: 7px 8px; }
-  .card { background: #fff; border: 1px solid #e8e4da; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .box-section { background: linear-gradient(135deg, #fdf8ed, #faf4e2); border: 2.5px solid #C4841D; border-radius: 10px; padding: 14px 18px; margin-top: 14px; }
-  .box-section .title { font-size: 12px; color: #C4841D; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.5px; }
-  .box-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
-  .box-card { background: #fff; border: 1px solid #e8e4da; border-radius: 8px; padding: 10px; text-align: center; }
-  .box-card .lbl { font-size: 8px; color: #999; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
-  .box-card .val { font-size: 17px; font-weight: 700; margin-top: 3px; }
-  .box-final { text-align: center; margin-top: 10px; padding-top: 10px; border-top: 2.5px solid #C4841D; }
-  .box-final .lbl { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .box-final .big { font-size: 24px; font-weight: 800; color: #C4841D; }
-  .footer { text-align: center; margin-top: 16px; font-size: 8.5px; color: #bbb; border-top: 1px solid #eee; padding-top: 8px; }
-  @media print { body { padding: 12mm; } }
+  body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #1a1a1a; background: #fff; }
+  .header { text-align: center; border-bottom: 3px double #C4841D; padding-bottom: 16px; margin-bottom: 20px; }
+  .header h1 { font-size: 22px; color: #C4841D; letter-spacing: 2px; text-transform: uppercase; }
+  .header .sub { font-size: 13px; color: #888; margin-top: 4px; }
+  .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; color: #555; }
+  .meta span { font-weight: 600; }
+  h2 { font-size: 15px; color: #C4841D; margin: 18px 0 8px; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 13px; }
+  th { background: #f5f5f0; padding: 6px 8px; text-align: left; font-weight: 700; border-bottom: 2px solid #ddd; }
+  td { border-bottom: 1px solid #eee; }
+  .total-row { background: #f5f5f0; font-weight: 700; }
+  .total-row td { border-top: 2px solid #C4841D; border-bottom: 2px solid #C4841D; padding: 8px; }
+  .caja { background: #fdf8ed; border: 2px solid #C4841D; border-radius: 10px; padding: 16px; margin-top: 20px; }
+  .caja h2 { border: none; margin-top: 0; }
+  .caja .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 10px 0; }
+  .caja .box { background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; text-align: center; }
+  .caja .box .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .caja .box .value { font-size: 20px; font-weight: 700; }
+  .caja .final { text-align: center; margin-top: 12px; padding-top: 12px; border-top: 2px solid #C4841D; }
+  .caja .final .big { font-size: 28px; font-weight: 700; color: #C4841D; }
+  .footer { text-align: center; margin-top: 24px; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 10px; }
+  @media print { body { padding: 15px; } }
 </style></head><body>
-
-<!-- ═══════════ ENCABEZADO ═══════════ -->
-<div class='hdr'>
-  <h1>⛽ GRIFOS KALA</h1>
-  <div class='sub'>REPORTE DE CIERRE DE TURNO</div>
+<div class='header'>
+  <h1>⛽ Grifos Kala</h1>
+  <div class='sub'>Reporte de Cierre de Turno</div>
 </div>
-
-<!-- ═══════════ INFORMACIÓN DEL TURNO ═══════════ -->
 <div class='meta'>
-  <div><div class='lbl'>📅 Fecha</div><div class='val'>${fecha}</div></div>
-  <div><div class='lbl'>👤 Trabajador</div><div class='val'>${nom}</div></div>
-  <div><div class='lbl'>⛽ Estación</div><div class='val'>${estacion}</div></div>
-  <div><div class='lbl'>🕐 Hora cierre</div><div class='val'>${hora}</div></div>
+  <div>Fecha: <span>${fecha}</span></div>
+  <div>Trabajador: <span>${nom}</span></div>
+  <div>Estación: <span>${estacion}</span></div>
+  <div>Hora: <span>${hora}</span></div>
 </div>
 
-<!-- ═══════════ LECTURAS DE MANGUERA ═══════════ -->
-<div class='card'>
-  <div class='section-title'>📋 LECTURAS DE MANGUERA</div>
-  ${productosVisibles.length > 0 ? `<table>
-    <thead><tr>
-      <th>Producto</th>
-      <th style='text-align:right'>Lectura Anterior</th>
-      <th style='text-align:right'>Lectura Actual</th>
-      <th style='text-align:right'>Galones Desp.</th>
-    </tr></thead>
-    <tbody>${productRowsA4}</tbody>
-  </table>` : '<div style="color:#999;font-size:10px;padding:6px 8px;background:#f9f9f6;border-radius:4px">No se registraron lecturas de manguera</div>'}
-</div>
-
-<!-- ═══════════ VENTAS VIRTUALES + VARILLADO/GASTOS ═══════════ -->
-<div class='two-col'>
-  <div class='card'>
-    <div class='section-title'>💳 VENTAS VIRTUALES</div>
-    ${ventasVirtuales.length > 0 ? `<table>
-      <thead><tr><th>Producto</th><th style='text-align:center'>Método</th><th style='text-align:right'>Cant.</th><th style='text-align:right'>Total</th></tr></thead>
-      <tbody>${virtualRowsA4}
-      <tr class='tr'><td colspan='3' style='text-align:right;font-size:9px;color:#888'>TOTAL VENTAS VIRTUALES</td><td style='text-align:right;color:#2E75B6;font-size:11px'>S/ ${totalVentasVirtuales.toFixed(2)}</td></tr>
-      </tbody>
-    </table>` : '<div style="color:#999;font-size:10px;padding:8px;text-align:center">Sin ventas virtuales registradas</div>'}
-  </div>
-  <div class='card'>
-    ${varilladoRowsA4 ? `<div class='section-title'>📏 VARILLADO</div><table><thead><tr><th>Tanque / Producto</th><th style='text-align:right'>Medición (cm)</th></tr></thead><tbody>${varilladoRowsA4}</tbody></table>` : '<div style="margin-bottom:8px"></div>'}
-    ${gastosRowsA4 ? `<div class='section-title'>💰 GASTOS</div><table><thead><tr><th>Concepto</th><th style='text-align:right'>Monto</th></tr></thead><tbody>${gastosRowsA4}<tr class='tr'><td style='text-align:right;font-size:9px;color:#888'>TOTAL GASTOS</td><td style='text-align:right;color:#C0392B;font-size:11px'>- S/ ${totalGastos.toFixed(2)}</td></tr></tbody></table>` : ''}
-  </div>
-</div>
-
-<!-- ═══════════ RESUMEN DE CAJA ═══════════ -->
-<div class='box-section'>
-  <div class='title'>💵 RESUMEN DE CAJA — Efectivo del Turno</div>
-  <div class='box-grid'>
-    <div class='box-card'>
-      <div class='lbl'>Ventas por Mangueras</div>
-      <div class='val' style='color:#C4841D'>S/ ${totalMangueras.toFixed(2)}</div>
-    </div>
-    <div class='box-card'>
-      <div class='lbl'>(-) Ventas Virtuales</div>
-      <div class='val' style='color:#2E75B6'>S/ ${totalVentasVirtuales.toFixed(2)}</div>
-    </div>
-    <div class='box-card'>
-      <div class='lbl'>(-) Gastos del Turno</div>
-      <div class='val' style='color:#C0392B'>S/ ${totalGastos.toFixed(2)}</div>
-    </div>
-  </div>
-  <div class='box-final'>
-    <div class='lbl'>EFECTIVO QUE DEBE ENTREGAR EL TRABAJADOR</div>
-    <div class='big'>S/ ${efectivoFijo.toFixed(2)}</div>
-  </div>
-</div>
-
-<!-- ═══════════ FIRMAS ═══════════ -->
-<div style='display:grid;grid-template-columns:1fr 60px 1fr;gap:0;margin-top:30px;padding-top:10px'>
-  <div style='text-align:center'>
-    <div style='border-top:1.5px solid #ccc;margin:0 20px;padding-top:6px;font-size:10px;color:#888;font-weight:600'>Firma del Trabajador</div>
-    <div style='margin-top:4px;font-size:9px;color:#aaa'>DNI: ${trabajador ? trabajador.dni || '---' : '---'}</div>
-  </div>
-  <div></div>
-  <div style='text-align:center'>
-    <div style='border-top:1.5px solid #ccc;margin:0 20px;padding-top:6px;font-size:10px;color:#888;font-weight:600'>Firma del Supervisor</div>
-    <div style='margin-top:4px;font-size:9px;color:#aaa'>V°B° _______________</div>
-  </div>
-</div>
-
-<div class='footer'>Grifos Kala S.A.C. — RUC: ${EMPRESA.ruc} — Generado el ${fecha} a las ${hora}</div>
-</body></html>`);
-        } else {
-          // ============ TÉRMICA POS-D 80mm — REPORTE DE CIERRE DE TURNO ============
-          w.document.write(`
-<!DOCTYPE html>
-<html><head><meta charset='utf-8'><title>Cierre de Turno - ${nom}</title>
-<style>
-  @page { size: 80mm auto; margin: 2mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', 'Lucida Console', monospace; padding: 4mm; width: 72mm; font-size: 11px; font-weight: 600; color: #000; background: #fff; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .c { text-align: center; }
-  .b { font-weight: 700; }
-  .sep { border-top: 1px dashed #000; margin: 2.5mm 0; }
-  .sep2 { border-top: 2.5px solid #000; margin: 2mm 0; }
-  .sep3 { border-top: 1px solid #999; margin: 2mm 0; }
-  .row { display: flex; justify-content: space-between; }
-  .section { font-size: 9.5px; font-weight: 700; letter-spacing: 1.2px; color: #000; margin: 3mm 0 1.5mm; text-transform: uppercase; }
-  .section::after { content: ''; display: block; border-bottom: 1px solid #000; margin-top: 1mm; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 2.5mm; font-size: 10px; font-weight: 600; }
-  th { text-align: left; font-weight: 700; border-bottom: 1.5px solid #000; padding: 1.5mm 0; font-size: 8.5px; letter-spacing: 0.5px; color: #333; text-transform: uppercase; }
-  td { padding: 1mm 0; border-bottom: 1px dotted #ccc; }
-  .total-row td { border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 2mm 0; font-weight: 700; }
-  .summary-box { border: 1.5px solid #000; padding: 2.5mm 3mm; margin: 2mm 0; }
-  .big { font-size: 20px; font-weight: 700; }
-  .small { font-size: 9px; color: #555; }
-  .cut { border-top: 2px dashed #000; margin-top: 4mm; padding-top: 3mm; text-align: center; font-size: 9px; color: #999; }
-  @media print { body { padding: 2mm; width: 76mm; } }
-</style></head><body>
-
-<!-- ═══ ENCABEZADO ═══ -->
-<div class='c'>
-  <div style='font-size:18px;font-weight:700;letter-spacing:2px'>⛽ GRIFOS KALA</div>
-  <div style='font-size:10px;font-weight:500;margin-top:1mm;color:#444'>REPORTE DE CIERRE DE TURNO</div>
-</div>
-
-<div class='sep2'></div>
-
-<!-- ═══ DATOS DEL TURNO ═══ -->
-<div style='font-size:10.5px;font-weight:600;line-height:1.9'>
-  <div class='row'><span style='color:#555'>Fecha:</span><span class='b'>${fecha}</span></div>
-  <div class='row'><span style='color:#555'>Trabajador:</span><span class='b'>${nom}</span></div>
-  <div class='row'><span style='color:#555'>Estación:</span><span>${estacion}</span></div>
-  <div class='row'><span style='color:#555'>Hora cierre:</span><span class='b'>${hora}</span></div>
-</div>
-
-<div class='sep2'></div>
-
-<!-- ═══ LECTURAS DE MANGUERA ═══ -->
-<div class='section'>📋 Lecturas de Manguera</div>
+<h2>📋 Lecturas de Manguera</h2>
 ${productosVisibles.length > 0 ? `<table>
-  <thead><tr><th>Prod.</th><th style='text-align:right'>Ant.</th><th style='text-align:right'>Act.</th><th style='text-align:right'>Galones</th></tr></thead>
+  <thead><tr><th>Producto</th><th style='text-align:right'>Anterior</th><th style='text-align:right'>Actual</th><th style='text-align:right'>Galones</th></tr></thead>
   <tbody>${productRows}</tbody>
-</table>` : '<div class="small">Sin lecturas registradas</div>'}
+</table>` : '<p style="color:#888;font-size:13px">Sin lecturas de manguera</p>'}
 
-<div class='sep'></div>
-
-<!-- ═══ VENTAS VIRTUALES ═══ -->
-<div class='section'>💳 Ventas Virtuales</div>
+<h2>💳 Ventas Virtuales</h2>
 ${ventasVirtuales.length > 0 ? `<table>
-  <thead><tr><th>Producto</th><th style='text-align:right'>Cant</th><th style='text-align:right'>Total</th></tr></thead>
+  <thead><tr><th>Producto</th><th style='text-align:right'>Cantidad</th><th style='text-align:center'>Método</th><th style='text-align:right'>Total</th></tr></thead>
   <tbody>${virtualRows}
-  <tr class='total-row'><td colspan='2' style='text-align:right;font-size:9px;color:#555'>TOTAL</td><td style='text-align:right'>S/ ${totalVentasVirtuales.toFixed(2)}</td></tr>
+  <tr class='total-row'><td colspan='3' style='text-align:right'>Total ventas virtuales</td><td style='text-align:right;font-family:monospace;color:#2E75B6'>S/ ${totalVentasVirtuales.toFixed(2)}</td></tr>
   </tbody>
-</table>` : '<div class="small">Sin ventas virtuales</div>'}
+</table>` : '<p style="color:#888;font-size:13px">Sin ventas virtuales</p>'}
 
-${varilladoRows ? `<div class='sep'></div><div class='section'>📏 Varillado</div><table><thead><tr><th>Tanque</th><th style='text-align:right'>cm</th></tr></thead><tbody>${varilladoRows}</tbody></table>` : ''}
+${varilladoRows ? `<h2>📏 Varillado</h2><table><thead><tr><th>Tanque</th><th style='text-align:right'>Medición</th></tr></thead><tbody>${varilladoRows}</tbody></table>` : ''}
 
-${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turno</div><table><thead><tr><th>Concepto</th><th style='text-align:right'>Monto</th></tr></thead><tbody>${gastosRows}<tr class='total-row'><td style='text-align:right;font-size:9px;color:#555'>TOTAL GASTOS</td><td style='text-align:right'>- S/ ${totalGastos.toFixed(2)}</td></tr></tbody></table>` : ''}
+${gastosRows ? `<h2>💰 Gastos de Turno</h2><table><thead><tr><th>Concepto</th><th style='text-align:right'>Monto</th></tr></thead><tbody>${gastosRows}<tr class='total-row'><td style='text-align:right'>Total gastos</td><td style='text-align:right;font-family:monospace;color:#C0392B'>- S/ ${totalGastos.toFixed(2)}</td></tr></tbody></table>` : ''}
 
-<!-- ═══ RESUMEN DE CAJA ═══ -->
-<div class='sep2'></div>
-<div class='c b' style='font-size:11px;letter-spacing:1.5px'>💵 RESUMEN DE CAJA</div>
-<div class='sep'></div>
-<div style='font-size:10.5px;font-weight:600;line-height:2.2'>
-  <div class='row'><span style='color:#555'>Ventas mangueras:</span><span class='b'>S/ ${totalMangueras.toFixed(2)}</span></div>
-  <div class='row'><span style='color:#555'>(-) Ventas virtuales:</span><span class='b'>- S/ ${totalVentasVirtuales.toFixed(2)}</span></div>
-  <div class='row'><span style='color:#555'>(-) Gastos:</span><span class='b'>- S/ ${totalGastos.toFixed(2)}</span></div>
-</div>
-
-<div class='sep2'></div>
-<div class='summary-box'>
-  <div class='c'>
-    <div class='small' style='margin-bottom:1mm'>EFECTIVO QUE DEBE ENTREGAR</div>
+<div class='caja'>
+  <h2 style='color:#C4841D'>💵 CAJA — Efectivo del Turno</h2>
+  <div class='grid'>
+    <div class='box'><div class='label'>MANGUERAS</div><div class='value' style='color:#C4841D'>S/ ${totalMangueras.toFixed(2)}</div></div>
+    <div class='box'><div class='label'>- VENTAS VIRTUALES</div><div class='value' style='color:#2E75B6'>- S/ ${totalVentasVirtuales.toFixed(2)}</div></div>
+    <div class='box'><div class='label'>- GASTOS</div><div class='value' style='color:#C0392B'>- S/ ${totalGastos.toFixed(2)}</div></div>
+  </div>
+  <div class='final'>
+    <div style='font-size:13px;color:#888;margin-bottom:4px'>EFECTIVO QUE DEBE TENER EL TRABAJADOR</div>
     <div class='big'>S/ ${efectivoFijo.toFixed(2)}</div>
   </div>
 </div>
 
-<div class='sep3'></div>
-
-<!-- ═══ FIRMAS ═══ -->
-<div style='margin-top:3mm'>
-  <div class='row small' style='margin-bottom:6mm'>
-    <span>________________________</span>
-    <span style='margin:0 4mm'></span>
-    <span>________________________</span>
-  </div>
-  <div class='row small' style='font-size:8px;color:#888'>
-    <span>Firma Trabajador</span>
-    <span style='margin:0 4mm'></span>
-    <span>Firma Supervisor</span>
-  </div>
-</div>
-
-<div class='sep3'></div>
-<div class='c small' style='font-weight:500'>Grifos Kala S.A.C. · RUC: ${EMPRESA.ruc}</div>
-<div class='c small' style='font-weight:500'>${fecha} ${hora}</div>
-<div class='cut'>- - - - - - - - - - - - - - - - - - - -</div>
+<div class='footer'>Grifos Kala S.A.C. — RUC: 20612345679 — Generado el ${fecha} a las ${hora}</div>
 </body></html>`);
-        }
         w.document.close();
         setTimeout(() => { w.print(); }, 600);
       }
@@ -2448,7 +1881,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
               );
             })}
             <div style={{ borderTop: `2px solid ${C.border}`, marginTop: 8, paddingTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>Total ventas:</span>
+              <span style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>Suma de mangueras:</span>
               <span style={{ fontFamily: 'JetBrains Mono', fontSize: 20, fontWeight: 700, color: C.amber }}>{money(totalMangueras)}</span>
             </div>
           </div>
@@ -2524,22 +1957,13 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
         {maquinasSeleccionadas.length > 0 && (
           <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
             <div style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 14 }}>📏 Varillado (cm)</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
               {productosVisibles.map(p => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: C.bg, borderRadius: 10, padding: '10px 14px', border: `1px solid ${C.border}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: isMobile ? 100 : 160 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 600, color: C.textDim, whiteSpace: 'nowrap' }}>{p.nombre}</span>
-                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, fontWeight: 600, color: C.amber, letterSpacing: '0.03em', marginTop: 1 }}>Tanque: {p.tanques}</span>
-                    </div>
-                  </div>
-                  <input type="number" step="1" min="0" placeholder="0" value={varillado[p.id] || ''} onChange={e => setVarillado(prev => ({ ...prev, [p.id]: e.target.value }))} style={{ width: isMobile ? '100%' : 100, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, textAlign: 'center', boxSizing: 'border-box' }} />
-                  <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, minWidth: 18 }}>cm</span>
-                  <div style={{ flex: 1 }} />
-                  {varillado[p.id] && (
-                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, fontWeight: 600, color: C.amber }}>{parseFloat(varillado[p.id]).toLocaleString()} cm</span>
-                  )}
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bg, borderRadius: 8, padding: '8px 12px', border: `1px solid ${C.border}` }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
+                  <span style={{ fontFamily: 'Inter', fontSize: 12, color: C.textDim, minWidth: 60 }}>{p.nombre.split(' ')[0]}:</span>
+                  <input type="number" step="1" min="0" placeholder="cm" value={varillado[p.id] || ''} onChange={e => setVarillado(prev => ({ ...prev, [p.id]: e.target.value }))} style={{ flex: 1, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 8px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 13, textAlign: 'center', boxSizing: 'border-box' }} />
+                  <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>cm</span>
                 </div>
               ))}
             </div>
@@ -2552,35 +1976,16 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
           <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 12 }}>Descuenta consumo de cisterna, viáticos, pagos externos, etc.</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {gastos.map(g => (
-              <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.bg, borderRadius: 8, padding: '8px 10px', border: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
-                <input type="text" placeholder="Concepto" value={g.concepto} onChange={e => actualizarGasto(g.id, 'concepto', e.target.value)} style={{ flex: 1, minWidth: 120, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />
-                <div style={{ display: 'flex', borderRadius: 6, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-                  <button onClick={() => actualizarGasto(g.id, 'tipo', 'soles')} type="button" style={{ padding: '6px 8px', background: g.tipo === 'soles' ? C.amberSoft : 'transparent', color: g.tipo === 'soles' ? C.amber : C.muted, border: 'none', fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter' }}>S/</button>
-                  <button onClick={() => actualizarGasto(g.id, 'tipo', 'galones')} type="button" style={{ padding: '6px 8px', background: g.tipo === 'galones' ? C.tealSoft : 'transparent', color: g.tipo === 'galones' ? C.teal : C.muted, border: 'none', borderLeft: `1px solid ${C.border}`, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter' }}>gal</button>
-                </div>
-                {g.tipo === 'galones' && (
-                  <select value={g.productoId || 'diesel'} onChange={e => actualizarGasto(g.id, 'productoId', e.target.value)} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 4px', color: C.text, fontFamily: 'Inter', fontSize: 10, boxSizing: 'border-box', cursor: 'pointer' }}>
-                    {PRODUCTOS.filter(p => p.id !== 'diesel4').map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                  </select>
-                )}
-                <input type="number" step="0.01" min="0" placeholder={g.tipo === 'galones' ? 'gal' : 'S/ 0.00'} value={g.monto} onChange={e => actualizarGasto(g.id, 'monto', e.target.value)} style={{ width: 90, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 8px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, textAlign: 'right', boxSizing: 'border-box' }} />
-                {g.tipo === 'galones' && g.monto ? <span style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: C.muted, minWidth: 60 }}>= {money(calcularMontoGasto(g))}</span> : null}
+              <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.bg, borderRadius: 8, padding: '8px 12px', border: `1px solid ${C.border}` }}>
+                <input type="text" placeholder="Concepto" value={g.concepto} onChange={e => actualizarGasto(g.id, 'concepto', e.target.value)} style={{ flex: 1, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />
+                <input type="number" step="0.01" min="0" placeholder="S/ 0.00" value={g.monto} onChange={e => actualizarGasto(g.id, 'monto', e.target.value)} style={{ width: 110, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, textAlign: 'right', boxSizing: 'border-box' }} />
                 <button onClick={() => eliminarGasto(g.id)} type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.red, padding: 4 }}><WI.Trash2 size={14} /></button>
               </div>
             ))}
             {/* Agregar gasto */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <input type="text" placeholder="Nuevo gasto..." value={nuevoGastoConcepto} onChange={e => setNuevoGastoConcepto(e.target.value)} onKeyDown={e => e.key === 'Enter' && agregarGasto()} style={{ flex: 1, minWidth: 120, background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 8, padding: '8px 12px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />
-              <div style={{ display: 'flex', borderRadius: 8, border: `1px dashed ${C.border}`, overflow: 'hidden' }}>
-                <button onClick={() => setNuevoGastoTipo('soles')} type="button" style={{ padding: '8px 10px', background: nuevoGastoTipo === 'soles' ? C.amberSoft : 'transparent', color: nuevoGastoTipo === 'soles' ? C.amber : C.muted, border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter' }}>S/</button>
-                <button onClick={() => setNuevoGastoTipo('galones')} type="button" style={{ padding: '8px 10px', background: nuevoGastoTipo === 'galones' ? C.tealSoft : 'transparent', color: nuevoGastoTipo === 'galones' ? C.teal : C.muted, border: 'none', borderLeft: `1px dashed ${C.border}`, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter' }}>gal</button>
-              </div>
-              {nuevoGastoTipo === 'galones' && (
-                <select value={nuevoGastoProducto} onChange={e => setNuevoGastoProducto(e.target.value)} style={{ background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 8, padding: '8px 6px', color: C.text, fontFamily: 'Inter', fontSize: 11, boxSizing: 'border-box', cursor: 'pointer' }}>
-                  {PRODUCTOS.filter(p => p.id !== 'diesel4').map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                </select>
-              )}
-              <input type="number" step="0.01" min="0" placeholder={nuevoGastoTipo === 'galones' ? 'gal' : 'S/'} value={nuevoGastoMonto} onChange={e => setNuevoGastoMonto(e.target.value)} onKeyDown={e => e.key === 'Enter' && agregarGasto()} style={{ width: 90, background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 8, padding: '8px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, textAlign: 'right', boxSizing: 'border-box' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="text" placeholder="Nuevo gasto..." value={nuevoGastoConcepto} onChange={e => setNuevoGastoConcepto(e.target.value)} onKeyDown={e => e.key === 'Enter' && agregarGasto()} style={{ flex: 1, background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 8, padding: '8px 12px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />
+              <input type="number" step="0.01" min="0" placeholder="S/" value={nuevoGastoMonto} onChange={e => setNuevoGastoMonto(e.target.value)} onKeyDown={e => e.key === 'Enter' && agregarGasto()} style={{ width: 110, background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 8, padding: '8px 12px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, textAlign: 'right', boxSizing: 'border-box' }} />
               <button onClick={agregarGasto} type="button" style={{ padding: '8px 12px', borderRadius: 8, background: C.amberSoft, border: `1px solid ${C.amber}44`, color: C.amber, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}><WI.Plus size={14} /></button>
             </div>
           </div>
@@ -2614,12 +2019,9 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
               <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted, marginBottom: 2 }}>EFECTIVO QUE DEBE TENER EL TRABAJADOR</div>
               <div style={{ fontFamily: 'JetBrains Mono', fontSize: 30, fontWeight: 700, color: efectivoFijo >= 0 ? C.green : C.red }}>{money(efectivoFijo)}</div>
             </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button onClick={() => imprimirCierreTurno('termica')} type="button" style={{ padding: '12px 18px', borderRadius: 10, background: 'none', border: `2px solid ${C.teal}`, color: C.teal, fontFamily: 'Inter', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                🧾 Imprimir térmica
-              </button>
-              <button onClick={() => imprimirCierreTurno('a4')} type="button" style={{ padding: '12px 18px', borderRadius: 10, background: 'none', border: `2px solid ${C.amber}`, color: C.amber, fontFamily: 'Inter', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                📄 Imprimir A4
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={imprimirCierreTurno} type="button" style={{ padding: '14px 24px', borderRadius: 10, background: 'none', border: `2px solid ${C.amber}`, color: C.amber, fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                🖨️ Imprimir cierre
               </button>
               <button type="button" style={{ padding: '14px 32px', borderRadius: 10, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <WI.FileText size={16} /> Cerrar turno
@@ -2657,7 +2059,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
         const todas = maquinasGlobal || [];
         return ids.map(id => todas.find(m => m.id === id)).filter(Boolean);
       })();
-      const ventasVisibles = [...ventasWorker];
+      const ventasVisibles = ventasWorker.filter(v => v.metodo !== 'Efectivo');
       const totalVentas = ventasWorker.length;
       const montoTotal = ventasWorker.reduce((a, v) => a + v.total, 0);
       function cambiarMetodo(id, nuevoMetodo) {
@@ -2727,7 +2129,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
             <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, flex: 1, overflowY: 'auto' }}>
               <div style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 14 }}>Ventas recientes</div>
               {ventasVisibles.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 30 }}><div style={{ fontSize: 28, marginBottom: 8 }}>🛒</div><div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>Sin ventas registradas</div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginTop: 4 }}>Las ventas aparecerán aquí</div></div>
+                <div style={{ textAlign: 'center', padding: 30 }}><div style={{ fontSize: 28, marginBottom: 8 }}>🛒</div><div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted }}>Sin ventas pendientes</div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginTop: 4 }}>Las ventas en efectivo se registran directo</div></div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {ventasVisibles.map((v) => (
@@ -2770,21 +2172,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
       const [seccion, setSeccion] = useState('resumen');
       const [estacion, setEstacion] = useState(ESTACIONES[0]);
       const [themeDark, setThemeDark] = useState(true);
-      const [palette, setPalette] = useState(DARK);
-      useEffect(() => {
-        C = palette;
-        document.body.style.background = palette.bg;
-        // Sync product colors with current theme
-        PRODUCTOS_BASE.forEach(p => {
-          const idx = PRODUCTOS.findIndex(pp => pp.id === p.id);
-          if (idx >= 0) {
-            const col = PRODUCTOS_COLORS[p.id] || {};
-            const tc = palette === DARK ? col.dark : col.light;
-            if (tc) PRODUCTOS[idx] = { ...PRODUCTOS[idx], color: tc.color, soft: tc.soft };
-          }
-        });
-      }, [palette]);
-      function toggleTheme() { setThemeDark(prev => { const next = !prev; setPalette(next ? DARK : LIGHT); return next; }); }
+      function toggleTheme() { setThemeDark(prev => { const next = !prev; C = next ? DARK : LIGHT; document.body.style.background = next ? '#12161A' : '#F5F5F0'; return next; }); }
       const [ventas, setVentas] = useState([
         { fecha: formatFechaCorta(new Date()), hora: '08:15', producto: 'Diésel B5', cant: '45.20 gal', precioUnitario: 23.10, total: 1044.12, metodo: 'Efectivo', comp: 'Boleta', serieBoleta: 'B001-00123', serieFactura: null, ruc: null, razonSocial: null, dniCliente: '48562190', nombreCliente: 'Milagros Condori', placa: null, items: [{ producto: 'Diésel B5', cant: '45.20 gal', precioUnitario: 23.10, total: 1044.12 }], itemCount: 1, esBancarizacion: false, trabajador: 'Milagros Condori' },
         { fecha: formatFechaCorta(new Date()), hora: '09:32', producto: 'Gasolina Regular', cant: '30.00 gal', precioUnitario: 19.90, total: 597.00, metodo: 'Yape', comp: 'Boleta', serieBoleta: 'B001-00124', serieFactura: null, ruc: null, razonSocial: null, dniCliente: '76901234', nombreCliente: 'Edwin Mamani', placa: 'ABC-123', items: [{ producto: 'Gasolina Regular', cant: '30.00 gal', precioUnitario: 19.90, total: 597.00 }], itemCount: 1, esBancarizacion: false, trabajador: 'Milagros Condori' },
@@ -2808,7 +2196,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
         { id: 'tanques', label: 'Tanques', Icon: I.Gauge },
         { id: 'comprobantes', label: 'Comprobantes', Icon: I.FileText },
         { id: 'trabajadores', label: 'Trabajadores', Icon: I.Users },
-        { id: 'vehiculos', label: 'Vehículos', Icon: I.Building2 },
+        { id: 'reportes', label: 'Reportes', Icon: I.BarChart3 },
       ];
 
       return (<div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column' }}>
@@ -2837,7 +2225,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
             {seccion === 'tanques' && <ControlTanquesAdmin estacion={estacion} />}
             {seccion === 'comprobantes' && <ComprobantesAdmin estacion={estacion} ventas={ventas} setVentas={setVentas} productos={PRODUCTOS} />}
             {seccion === 'trabajadores' && <TrabajadoresAdmin />}
-            {seccion === 'vehiculos' && <VehiculosAdmin estacion={estacion} />}
+            {seccion === 'reportes' && <ReportesAdmin />}
           </div>
         </div>
       </div>);
@@ -2845,12 +2233,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
 
     /* ===================== RENDER ===================== */
     window.onerror = function(msg, src, line, col, err) { document.getElementById('root').innerHTML = '<div style="padding:20px;color:#f44;font-family:monospace;background:#1a1a1a;min-height:100vh"><h2>❌ Error</h2><pre style="white-space:pre-wrap;margin-top:10px;font-size:13px">' + msg + '\nLine: ' + line + ':' + col + '\n' + (err && err.stack ? err.stack : '') + '</pre></div>'; };
-    // key on App forces full re-mount when theme changes, so all components pick up new PRODUCTOS colors
-    function AppWrapper() {
-      const [themeDark, setThemeDark] = useState(true);
-      return <App key={themeDark ? 'dark' : 'light'} themeDark={themeDark} setThemeDark={setThemeDark} />;
-    }
-    ReactDOM.createRoot(document.getElementById('root')).render(<AppWrapper />);
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
 </body>
 </html>
