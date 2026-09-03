@@ -19,10 +19,10 @@
 
 const SUPABASE_CONFIG = {
   // Reemplaza con tu URL de Supabase (ejemplo: https://xyzcompany.supabase.co)
-  url: 'YOUR_SUPABASE_URL',
+  url: 'https://qeolojwhomasmjwyqleg.supabase.co',
   
   // Reemplaza con tu clave anónima de Supabase
-  anonKey: 'YOUR_SUPABASE_ANON_KEY',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlb2xvandob21hc21qd3lxbGVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NDEwODAsImV4cCI6MjEwNDAxNzA4MH0.N3QEpNYLRoA2oqOr8CstG96JszxtECsWwI7FeI_iuCE',
 };
 
 // =============================================
