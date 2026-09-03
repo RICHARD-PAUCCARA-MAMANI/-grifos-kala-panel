@@ -88,42 +88,215 @@
   <!-- Supabase Client Library -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
+    /* ===== BASE RESET ===== */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body, #root { width: 100%; min-height: 100vh; }
-    body { font-family: 'Inter', sans-serif; background: #12161A; }
+    html { width: 100%; min-height: 100vh; }
+    body { font-family: 'Inter', sans-serif; background: #12161A; width: 100%; min-height: 100vh; overflow-x: hidden; }
+    #root { width: 100%; min-height: 100vh; }
     input:focus, select:focus { outline: none; }
     button { font: inherit; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-thumb { background: #343E46; border-radius: 3px; }
-    .hide-mobile { display: initial; }
-    .tabs-scroll { display: flex; gap: 8px; }
+    img { max-width: 100%; height: auto; }
     
-    /* Multiplatform Responsive Design */
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #343E46; border-radius: 3px; }
+    
+    /* ===== MOBILE FIRST (320px - 640px) ===== */
+    .hide-mobile { display: initial; }
+    .tabs-scroll { display: flex; gap: 6px; }
+    
+    /* ===== MOBILE (max-width: 640px) ===== */
     @media (max-width: 640px) {
       .hide-mobile { display: none !important; }
-      .tabs-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-wrap: nowrap; padding-bottom: 4px; }
-      .tabs-scroll::-webkit-scrollbar { display: none; }
-    }
-    
-    @media (min-width: 641px) and (max-width: 1024px) {
-      /* Tablet styles */
       .hide-tablet { display: none !important; }
+      .hide-desktop { display: none !important; }
+      .show-mobile { display: block !important; }
+      .show-mobile-flex { display: flex !important; }
+      .show-mobile-grid { display: grid !important; }
+      
+      /* Tabs */
+      .tabs-scroll { 
+        overflow-x: auto; 
+        -webkit-overflow-scrolling: touch; 
+        scrollbar-width: none; 
+        flex-wrap: nowrap; 
+        padding-bottom: 6px;
+        gap: 4px;
+      }
+      .tabs-scroll::-webkit-scrollbar { display: none; }
+      
+      /* Grid layouts */
+      .grid-2 { grid-template-columns: 1fr !important; }
+      .grid-3 { grid-template-columns: 1fr !important; }
+      .grid-4 { grid-template-columns: 1fr !important; }
+      .grid-2-mobile { grid-template-columns: repeat(2, 1fr) !important; }
+      
+      /* Flex layouts */
+      .flex-col-mobile { flex-direction: column !important; }
+      .flex-wrap-mobile { flex-wrap: wrap !important; }
+      
+      /* Spacing */
+      .gap-mobile-8 { gap: 8px !important; }
+      .gap-mobile-12 { gap: 12px !important; }
+      .gap-mobile-16 { gap: 16px !important; }
+      .gap-mobile-20 { gap: 20px !important; }
+      .p-mobile-8 { padding: 8px !important; }
+      .p-mobile-12 { padding: 12px !important; }
+      .p-mobile-16 { padding: 16px !important; }
+      .m-mobile-0 { margin: 0 !important; }
+      .mb-mobile-8 { margin-bottom: 8px !important; }
+      .mb-mobile-12 { margin-bottom: 12px !important; }
+      .mb-mobile-16 { margin-bottom: 16px !important; }
+      
+      /* Text sizes */
+      .text-mobile-xs { font-size: 10px !important; }
+      .text-mobile-sm { font-size: 12px !important; }
+      .text-mobile-base { font-size: 14px !important; }
+      .text-mobile-lg { font-size: 16px !important; }
+      .text-mobile-xl { font-size: 18px !important; }
+      .text-mobile-2xl { font-size: 20px !important; }
+      
+      /* Buttons */
+      .btn-mobile {
+        width: 100% !important;
+        min-height: 44px !important;
+        padding: 10px 12px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        border-radius: 10px !important;
+      }
+      .btn-mobile-sm {
+        min-height: 36px !important;
+        padding: 8px 10px !important;
+        font-size: 12px !important;
+      }
+      
+      /* Inputs */
+      .input-mobile {
+        width: 100% !important;
+        min-height: 44px !important;
+        padding: 10px 12px !important;
+        font-size: 14px !important;
+      }
+      
+      /* Cards */
+      .card-mobile {
+        border-radius: 12px !important;
+        padding: 12px !important;
+      }
+      .card-mobile-sm {
+        border-radius: 10px !important;
+        padding: 10px !important;
+      }
+      
+      /* Header */
+      .header-mobile {
+        padding: 12px 14px !important;
+        flex-direction: column !important;
+        gap: 8px !important;n      }
+      .header-mobile-inner {
+        width: 100% !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+      }
+      
+      /* Table */
+      .table-mobile {
+        font-size: 12px !important;
+      }
+      .table-mobile th, .table-mobile td {
+        padding: 6px 4px !important;
+        font-size: 11px !important;
+      }
+      
+      /* Navigation */
+      .nav-mobile {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        background: #1A1F25 !important;
+        border-top: 1px solid #343E46 !important;
+        padding: 6px 0 !important;
+        padding-bottom: env(safe-area-inset-bottom, 6px) !important;
+        z-index: 1000 !important;
+        display: flex !important;
+        justify-content: space-around !important;
+        align-items: center !important;
+      }
+      .nav-item {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 2px !important;
+        padding: 4px 8px !important;
+        min-width: 50px !important;
+        color: #7C868D !important;
+        font-size: 10px !important;
+        font-weight: 500 !important;
+        text-decoration: none !important;
+      }
+      .nav-item.active {
+        color: #E8A33D !important;
+      }
+      .nav-item svg {
+        width: 20px !important;
+        height: 20px !important;
+      }
+      
+      /* Bottom padding for fixed nav */
+      .bottom-nav-padding {
+        padding-bottom: 70px !important;
+      }
+      
+      /* Modal */
+      .modal-mobile {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        background: rgba(0,0,0,0.8) !important;
+        z-index: 2000 !important;
+        display: flex !important;
+        align-items: flex-end !important;
+        justify-content: center !important;
+      }
+      .modal-content-mobile {
+        width: 100% !important;
+        max-height: 90vh !important;
+        background: #212930 !important;
+        border-radius: 16px 16px 0 0 !important;
+        padding: 16px !important;
+        overflow-y: auto !important;
+      }
     }
     
-    /* Touch-friendly buttons */
+    /* ===== TABLET (641px - 1024px) ===== */
+    @media (min-width: 641px) and (max-width: 1024px) {
+      .hide-tablet { display: none !important; }
+      .show-tablet { display: block !important; }
+      .grid-2-tablet { grid-template-columns: repeat(2, 1fr) !important; }
+      .grid-3-tablet { grid-template-columns: repeat(2, 1fr) !important; }
+      .grid-4-tablet { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+    
+    /* ===== TOUCH DEVICES ===== */
     @media (pointer: coarse) {
       button, input, select {
         min-height: 44px;
         min-width: 44px;
       }
+      .btn-touch {
+        min-height: 48px !important;
+        padding: 12px 16px !important;
+      }
     }
     
-    /* PWA-like meta tags */
+    /* ===== PWA & SAFE AREAS ===== */
     @media (display-mode: standalone) {
       body { padding-top: env(safe-area-inset-top); }
     }
-    
-    /* Safe area for notch devices */
     @supports (padding: env(safe-area-inset-top)) {
       body {
         padding-top: env(safe-area-inset-top);
@@ -132,6 +305,29 @@
         padding-right: env(safe-area-inset-right);
       }
     }
+    
+    /* ===== UTILITY CLASSES ===== */
+    .w-full { width: 100%; }
+    .h-full { height: 100%; }
+    .overflow-hidden { overflow: hidden; }
+    .overflow-auto { overflow: auto; }
+    .overflow-x-auto { overflow-x: auto; }
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .flex-wrap { flex-wrap: wrap; }
+    .items-center { align-items: center; }
+    .justify-center { justify-content: center; }
+    .justify-between { justify-content: space-between; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .font-bold { font-weight: 700; }
+    .font-extrabold { font-weight: 900; }
+    .rounded-lg { border-radius: 12px; }
+    .rounded-xl { border-radius: 16px; }
+    .shadow-lg { box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+    .transition { transition: all 0.2s ease; }
+    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .whitespace-nowrap { white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -667,21 +863,22 @@
       const [error, setError] = useState('');
       function submit() { if (!usuario.trim() || !clave.trim()) { setError('Ingresa tu usuario y contraseña.'); return; } setError(''); onLogin(rol, usuario.trim()); }
       function onKeyDownField(e) { if (e.key === 'Enter') submit(); }
-      return (<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, padding: 20 }}>
-        <div style={{ width: '100%', maxWidth: 380 }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 26 }}><Logo /></div>
-          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 24 }}>
-            <div style={{ display: 'flex', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 3, marginBottom: 20 }}>
-              {['trabajador', 'admin'].map(r => (<button key={r} type="button" onClick={() => setRol(r)} style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: 'none', background: rol === r ? C.amber : 'transparent', color: rol === r ? C.bg : C.textDim, fontFamily: 'Inter', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>{r === 'trabajador' ? 'Trabajador' : 'Administrador'}</button>))}
+      const isMobile = useIsMobile();
+      return (<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, padding: isMobile ? '16px' : '20px' }}>
+        <div style={{ width: '100%', maxWidth: 400 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: isMobile ? 20 : 26 }}><Logo /></div>
+          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: isMobile ? '16px' : '24px' }}>
+            <div style={{ display: 'flex', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 3, marginBottom: isMobile ? 16 : 20 }}>
+              {['trabajador', 'admin'].map(r => (<button key={r} type="button" onClick={() => setRol(r)} style={{ flex: 1, padding: isMobile ? '10px 0' : '9px 0', borderRadius: 8, border: 'none', background: rol === r ? C.amber : 'transparent', color: rol === r ? C.bg : C.textDim, fontFamily: 'Inter', fontWeight: 600, fontSize: isMobile ? 12 : 13, cursor: 'pointer', minHeight: 44 }}>{r === 'trabajador' ? 'Trabajador' : 'Administrador'}</button>))}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <Field label="Usuario"><input style={getInputStyle()} placeholder="ej. mcondori" value={usuario} onChange={e => setUsuario(e.target.value)} onKeyDown={onKeyDownField} /></Field>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 14 }}>
+              <Field label="Usuario"><input style={{ ...getInputStyle(), minHeight: 44, fontSize: isMobile ? 16 : 13.5 }} placeholder="ej. mcondori" value={usuario} onChange={e => setUsuario(e.target.value)} onKeyDown={onKeyDownField} /></Field>
               <Field label="Contraseña"><div style={{ position: 'relative' }}>
-                <input style={{ ...getInputStyle(), paddingRight: 38 }} type={verClave ? 'text' : 'password'} placeholder="••••••••" value={clave} onChange={e => setClave(e.target.value)} onKeyDown={onKeyDownField} />
-                <button type="button" onClick={() => setVerClave(v => !v)} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 4 }}>{verClave ? <I.EyeOff size={16} /> : <I.Eye size={16} />}</button>
+                <input style={{ ...getInputStyle(), paddingRight: 44, minHeight: 44, fontSize: isMobile ? 16 : 13.5 }} type={verClave ? 'text' : 'password'} placeholder="••••••••" value={clave} onChange={e => setClave(e.target.value)} onKeyDown={onKeyDownField} />
+                <button type="button" onClick={() => setVerClave(v => !v)} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 8, minHeight: 44, minWidth: 44 }}>{verClave ? <I.EyeOff size={18} /> : <I.Eye size={18} />}</button>
               </div></Field>
-              {error && <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.red, fontFamily: 'Inter', fontSize: 12.5 }}><I.AlertTriangle size={14} /> {error}</div>}
-              <button type="button" onClick={submit} style={{ marginTop: 4, background: C.amber, color: C.bg, border: 'none', borderRadius: 9, padding: '11px 0', fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Ingresar</button>
+              {error && <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: C.red, fontFamily: 'Inter', fontSize: isMobile ? 11 : 12.5 }}><I.AlertTriangle size={14} /> {error}</div>}
+              <button type="button" onClick={submit} style={{ marginTop: 4, background: C.amber, color: C.bg, border: 'none', borderRadius: 10, padding: isMobile ? '12px 0' : '11px 0', fontFamily: 'Inter', fontWeight: 700, fontSize: isMobile ? 15 : 14, cursor: 'pointer', minHeight: 48, width: '100%' }}>Ingresar</button>
             </div>
           </div>
         </div>
@@ -2922,42 +3119,61 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
       const fechaLarga = now.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' });
       const fechaFormateada = fechaLarga.charAt(0).toUpperCase() + fechaLarga.slice(1);
 
+      const isMobile = useIsMobile();
       return (<div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column' }}>
         {/* ===== TOP BAR ===== */}
-        <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Logo />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, fontFamily: 'Inter', fontSize: 12.5, color: C.textDim }}>
-            <WI.Building2 size={14} color={C.muted} /> {estacion}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Inter', fontSize: 12.5, color: C.textDim }}>
-            <WI.Clock size={14} color={C.muted} /> {fechaFormateada}
-          </div>
-          <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Inter', fontSize: 12.5, color: C.textDim }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green }} />
-            {nombreMostrar} · Trabajador
-          </div>
-          <button onClick={onToggleTheme} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, fontFamily: 'Inter', fontSize: 12, cursor: 'pointer' }}>
-            <WI.Sun size={14} color={C.amber} /> {themeDark ? 'Claro' : 'Oscuro'}
-          </button>
-          <button onClick={onLogout} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: 'none', border: `1px solid ${C.border}`, color: C.textDim, fontFamily: 'Inter', fontSize: 12, cursor: 'pointer' }}>
-            <WI.LogOut size={14} /> Salir
-          </button>
+        <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: isMobile ? '10px 12px' : '12px 20px', display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          <div style={{ flexShrink: 0 }}><Logo /></div>
+          {!isMobile && (<>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, fontFamily: 'Inter', fontSize: 12.5, color: C.textDim }}>
+              <WI.Building2 size={14} color={C.muted} /> {estacion}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Inter', fontSize: 12.5, color: C.textDim }}>
+              <WI.Clock size={14} color={C.muted} /> {fechaFormateada}
+            </div>
+            <div style={{ flex: 1 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Inter', fontSize: 12.5, color: C.textDim }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green }} />
+              {nombreMostrar} · Trabajador
+            </div>
+          </>)}
+          {isMobile && (<div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Inter', fontSize: 11, color: C.textDim }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, flexShrink: 0 }} />
+              <span className='truncate'>{nombreMostrar}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={onToggleTheme} type="button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, cursor: 'pointer' }}>
+                <WI.Sun size={16} color={C.amber} />
+              </button>
+              <button onClick={onLogout} type="button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, background: 'none', border: `1px solid ${C.border}`, color: C.textDim, cursor: 'pointer' }}>
+                <WI.LogOut size={16} />
+              </button>
+            </div>
+          </div>)}
+          {!isMobile && (<>
+            <button onClick={onToggleTheme} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, fontFamily: 'Inter', fontSize: 12, cursor: 'pointer' }}>
+              <WI.Sun size={14} color={C.amber} /> {themeDark ? 'Claro' : 'Oscuro'}
+            </button>
+            <button onClick={onLogout} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, background: 'none', border: `1px solid ${C.border}`, color: C.textDim, fontFamily: 'Inter', fontSize: 12, cursor: 'pointer' }}>
+              <WI.LogOut size={14} /> Salir
+            </button>
+          </>)}
         </div>
 
         {/* ===== TABS ===== */}
-        <div style={{ borderBottom: `1px solid ${C.border}`, padding: '12px 20px', display: 'flex', gap: 8 }}>
-          {[{ id: 'venta', label: 'Nueva venta', icon: WI.FilePlus }, { id: 'cierre', label: 'Cierre de turno', icon: WI.Receipt }].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, border: `1px solid ${tab === t.id ? C.amber : C.border}`, background: tab === t.id ? C.amberSoft : C.panel, color: tab === t.id ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+        <div style={{ borderBottom: `1px solid ${C.border}`, padding: isMobile ? '10px 12px' : '12px 20px', display: 'flex', gap: isMobile ? 6 : 8, overflowX: 'auto' }}>
+          {[{ id: 'venta', label: isMobile ? 'Venta' : 'Nueva venta', icon: WI.FilePlus }, { id: 'cierre', label: isMobile ? 'Cierre' : 'Cierre de turno', icon: WI.Receipt }].map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: isMobile ? '10px 16px' : '9px 18px', borderRadius: 9, border: `1px solid ${tab === t.id ? C.amber : C.border}`, background: tab === t.id ? C.amberSoft : C.panel, color: tab === t.id ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: isMobile ? 12 : 13, fontWeight: 600, cursor: 'pointer', minHeight: 44, whiteSpace: 'nowrap' }}>
               <t.icon size={14} /> {t.label}
             </button>
           ))}
         </div>
 
-        {/* ===== CONTENT: 2 COLUMNS ===== */}
-        <div style={{ flex: 1, padding: '20px', display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+        {/* ===== CONTENT ===== */}
+        <div style={{ flex: 1, padding: isMobile ? '12px' : '20px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: isMobile ? 12 : 20, maxWidth: 1200, margin: '0 auto', width: '100%', paddingBottom: isMobile ? '80px' : '20px' }}>
           {/* LEFT: Main content */}
-          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 24, overflowY: 'auto' }}>
+          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: isMobile ? '14px' : '24', overflowY: 'auto' }}>
             {tab === 'venta' ? (
               <WorkerNuevaVenta usuario={nombreMostrar} estacion={estacion} ventasWorker={ventasWorker} setVentasWorker={setVentasWorker} />
             ) : (
@@ -2965,8 +3181,8 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
             )}
           </div>
 
-          {/* RIGHT: Sidebar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* RIGHT: Sidebar - Hidden on mobile, shown as bottom section */}
+          {!isMobile && (<div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Turno card */}
             <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -3011,7 +3227,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
                 </div>
               )}
             </div>
-          </div>
+          </div>)}
         </div>
       </div>);
     }
@@ -3065,27 +3281,28 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
         { id: 'vehiculos', label: 'Vehículos', Icon: I.Building2 },
       ];
 
+      const isMobile = useIsMobile();
       return (<div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column' }}>
         {/* TOP BAR */}
-        <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: '12px 20px' }}>
-          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Logo />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <select value={estacion} onChange={e => setEstacion(e.target.value)} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 12px', color: C.text, fontFamily: 'Inter', fontSize: 12.5, cursor: 'pointer' }}>
+        <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: isMobile ? '10px 12px' : '12px 20px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? 8 : 12 }}>
+            <div style={{ flexShrink: 0 }}><Logo /></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <select value={estacion} onChange={e => setEstacion(e.target.value)} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? '8px 10px' : '7px 12px', color: C.text, fontFamily: 'Inter', fontSize: isMobile ? 11 : 12.5, cursor: 'pointer', minWidth: isMobile ? 100 : 'auto' }}>
                 {ESTACIONES.map(e => <option key={e} value={e} style={{ background: C.panel }}>{e}</option>)}
               </select>
-              <button onClick={() => setScreen('login')} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 14px', color: C.textDim, cursor: 'pointer', fontFamily: 'Inter', fontSize: 12 }}>
-                <I.LogOut size={14} /> Salir
+              <button onClick={() => setScreen('login')} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? '8px 12px' : '7px 14px', color: C.textDim, cursor: 'pointer', fontFamily: 'Inter', fontSize: isMobile ? 11 : 12, minHeight: 36 }}>
+                <I.LogOut size={14} /> {!isMobile && 'Salir'}
               </button>
             </div>
           </div>
         </div>
         {/* TABS */}
-        <div style={{ borderBottom: `1px solid ${C.border}`, padding: '12px 20px' }}>
+        <div style={{ borderBottom: `1px solid ${C.border}`, padding: isMobile ? '10px 12px' : '12px 20px', overflowX: 'auto' }}>
           <div style={{ maxWidth: 1100, margin: '0 auto' }}><TabBar tabs={adminTabs} active={seccion} onChange={setSeccion} /></div>
         </div>
         {/* CONTENT */}
-        <div style={{ flex: 1, padding: '22px 20px' }}>
+        <div style={{ flex: 1, padding: isMobile ? '14px 12px' : '22px 20px', paddingBottom: isMobile ? '80px' : '22px' }}>
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
             {seccion === 'resumen' && <ResumenAdmin estacion={estacion} />}
             {seccion === 'tanques' && <ControlTanquesAdmin estacion={estacion} />}
