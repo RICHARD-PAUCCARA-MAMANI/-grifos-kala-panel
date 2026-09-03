@@ -80,6 +80,8 @@
   <script crossorigin src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
   <script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
   <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Supabase Client Library -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { width: 100%; min-height: 100vh; }
@@ -103,6 +105,145 @@
   <script type="text/babel">
     const { useState, useMemo, useEffect } = React;
     const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } = Recharts;
+
+    /* ===================== SUPABASE CONFIGURATION ===================== */
+    // Configuración de Supabase para Grifos Kala
+    // IMPORTANTE: Reemplaza这些 valores con tus credenciales de Supabase
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // Ejemplo: https://xyzcompany.supabase.co
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Tu clave anónima
+    
+    // Inicializar cliente de Supabase
+    let supabase = null;
+    if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
+      supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+    }
+    
+    // Funciones de ayuda para Supabase
+    const db = {
+      // Obtener productos
+      async getProductos() {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        const { data, error } = await supabase.from('productos').select('*').eq('activo', true);
+        return { data, error };
+      },
+      
+      // Obtener empleados
+      async getEmpleados(estacionId) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        let query = supabase.from('empleados').select('*').eq('activo', true);
+        if (estacionId) query = query.eq('estacion_id', estacionId);
+        const { data, error } = await query;
+        return { data, error };
+      },
+      
+      // Obtener empleados por usuario (login)
+      async getEmpleadoByUsuario(usuario) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        const { data, error } = await supabase.from('empleados').select('*').eq('usuario', usuario).eq('activo', true).single();
+        return { data, error };
+      },
+      
+      // Obtener máquinas
+      async getMaquinas(estacionId) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        let query = supabase.from('maquinas').select('*');
+        if (estacionId) query = query.eq('estacion_id', estacionId);
+        const { data, error } = await query;
+        return { data, error };
+      },
+      
+      // Crear venta
+      async createVenta(venta) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        const { data, error } = await supabase.from('ventas').insert(venta).select();
+        return { data, error };
+      },
+      
+      // Crear items de venta
+      async createVentaItems(items) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        const { data, error } = await supabase.from('venta_items').insert(items);
+        return { data, error };
+      },
+      
+      // Obtener ventas por turno
+      async getVentasByTurno(turnoId) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        const { data, error } = await supabase.from('ventas').select('*, venta_items(*)').eq('turno_id', turnoId);
+        return { data, error };
+      },
+      
+      // Crear turno
+      async createTurno(turno) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        const { data, error } = await supabase.from('turnos').insert(turno).select();
+        return { data, error };
+      },
+      
+      // Cerrar turno
+      async closeTurno(turnoId, cajaFinal) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        const { data, error } = await supabase.from('turnos').update({
+          fecha_fin: new Date().toISOString(),
+          caja_final: cajaFinal,
+          estado: 'cerrada'
+        }).eq('id', turnoId);
+        return { data, error };
+      },
+      
+      // Actualizar precio de producto
+      async updatePrecio(productoId, nuevoPrecio) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        const { data, error } = await supabase.from('productos').update({ precio: nuevoPrecio }).eq('id', productoId);
+        return { data, error };
+      },
+      
+      // Obtener ventas del día
+      async getVentasDelDia(fecha, estacionId) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        const inicio = new Date(fecha);
+        inicio.setHours(0, 0, 0, 0);
+        const fin = new Date(fecha);
+        fin.setHours(23, 59, 59, 999);
+        
+        let query = supabase.from('ventas')
+          .select('*')
+          .gte('created_at', inicio.toISOString())
+          .lte('created_at', fin.toISOString())
+          .eq('estado', 'completada');
+        
+        if (estacionId) query = query.eq('estacion_id', estacionId);
+        
+        const { data, error } = await query;
+        return { data, error };
+      },
+      
+      // Estadísticas del dashboard
+      async getDashboardStats(estacionId) {
+        if (!supabase) return { data: null, error: 'Supabase no configurado' };
+        
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        
+        // Ventas de hoy
+        const { data: ventasHoy } = await supabase.from('ventas')
+          .select('total')
+          .gte('created_at', hoy.toISOString())
+          .eq('estado', 'completada');
+        
+        // Total ventas hoy
+        const totalVentasHoy = ventasHoy?.reduce((sum, v) => sum + v.total, 0) || 0;
+        const countVentas = ventasHoy?.length || 0;
+        
+        return {
+          data: {
+            ventasHoy: totalVentasHoy,
+            countVentas: countVentas,
+          },
+          error: null
+        };
+      }
+    };
 
     /* ===================== PALETTE ===================== */
     const DARK = {

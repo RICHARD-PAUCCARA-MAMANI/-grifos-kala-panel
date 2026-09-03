@@ -1,0 +1,17 @@
+{
+  "name": "grifos-kala-supabase",
+  "version": "1.0.0",
+  "description": "Panel de Operaciones Grifos Kala con Supabase",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo 'Static site - no build needed'"
+  },
+  "keywords": ["grifos", "kala", "gas-station", "supabase"],
+  "author": "GRIFOS KALA S.A.C.",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "serve": "^14.0.0"
+  }
+}
