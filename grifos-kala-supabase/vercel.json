@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "name": "grifos-kala",
+  "name": "grifos-kala-panel",
   "builds": [
     {
       "src": "index.html",
@@ -13,15 +13,7 @@
       "dest": "/index.html"
     }
   ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, s-maxage=86400"
-        }
-      ]
-    }
-  ]
+  "outputDirectory": ".",
+  "installCommand": "echo 'No install needed'",
+  "buildCommand": "echo 'No build needed'"
 }
