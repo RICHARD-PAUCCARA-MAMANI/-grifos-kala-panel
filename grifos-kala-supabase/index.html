@@ -2116,64 +2116,75 @@
 
         w.document.write(`<!DOCTYPE html><html><head><meta charset='utf-8'><title>Comprobante</title>
 <style>
-  @page { size: 58mm auto; margin: 2mm; }
+  @page { size: 58mm auto; margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', 'Lucida Console', 'Consolas', monospace; padding: 3mm; width: 52mm; font-size: 11px; font-weight: 700; color: #000; background: #fff; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: 0.2px; }
+  body { font-family: 'Arial Narrow', Impact, 'Arial Black', 'Helvetica Neue', Arial, sans-serif; padding: 2mm 3mm; width: 52mm; font-size: 9px; font-weight: 400; color: #000; background: #fff; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: 0.2px; }
   .c { text-align: center; }
-  .b { font-weight: 900; }
-  .sep { border-top: 1.5px dashed #000; margin: 2.5mm 0; }
-  .sep2 { border-top: 2.5px solid #000; margin: 2.5mm 0; }
-  .sep3 { border-top: 1px solid #666; margin: 2mm 0; }
+  .b { font-weight: 700; }
+  .sep { border-top: 1px dashed #000; margin: 2mm 0; }
+  .sep2 { border-top: 2px solid #000; margin: 2mm 0; }
+  .sep3 { border-top: 1px solid #999; margin: 1.5mm 0; }
   .row { display: flex; justify-content: space-between; align-items: baseline; }
-  .small { font-size: 9px; color: #333; font-weight: 600; }
-  .big { font-size: 16px; font-weight: 900; }
-  .total-box { border: 2.5px solid #000; padding: 2.5mm 3mm; margin: 2.5mm 0; background: #f5f5f5; }
-  .total-row { font-size: 14px; font-weight: 900; }
+  .row-label { display: flex; gap: 2mm; align-items: baseline; }
+  .label { font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+  .small { font-size: 7px; font-weight: 400; }
+  .big { font-size: 12px; font-weight: 700; }
+  .total-box { border: 1.5px solid #000; padding: 2mm 3mm; margin: 2mm 0; }
+  .total-row { font-size: 11px; font-weight: 700; }
   table { width: 100%; border-collapse: collapse; }
-  td { padding: 1.5px 0; font-size: 10px; font-weight: 700; }
-  .th { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px; color: #000; border-bottom: 2px solid #000; padding: 1.5mm 0; }
-  .cut { border-top: 2.5px dashed #000; margin-top: 4mm; padding-top: 3mm; text-align: center; font-size: 10px; color: #666; font-weight: 600; }
-  @media print { body { padding: 2mm; width: 54mm; } }
+  th { font-size: 7px; font-weight: 700; text-transform: uppercase; border-bottom: 1px solid #000; padding: 1mm 0; text-align: left; }
+  td { padding: 0.8mm 0; font-size: 8px; font-weight: 400; }
+  .th-r { text-align: right; }
+  .td-r { text-align: right; }
+  .cut { border-top: 1.5px dashed #000; margin-top: 3mm; padding-top: 2mm; text-align: center; font-size: 7px; color: #666; }
+  @media print { body { padding: 2mm 3mm; width: 52mm; } }
 </style></head><body>
 
 <!-- ═══ ENCABEZADO ═══ -->
 <div class='c'>
-  <div style='font-size:16px;font-weight:900;letter-spacing:2px'>⛽ GRIFOS KALA</div>
-  <div style='font-size:9px;font-weight:700;margin-top:1.5mm;color:#222'>${EMPRESA.razonSocial}</div>
-  <div style='font-size:9px;font-weight:700;color:#222'>RUC: ${EMPRESA.ruc}</div>
-  <div style='font-size:8px;font-weight:600;color:#333'>${EMPRESA.direccion}</div>
-  <div style='font-size:8px;font-weight:600;color:#333'>${EMPRESA.distrito} · Tel: ${EMPRESA.telefono}</div>
+  <div style='font-size:18px;font-weight:900;letter-spacing:1px'>GRIFOS KALA</div>
+  <div style='font-size:9px;font-weight:900;margin-top:1mm'>${EMPRESA.razonSocial}</div>
+  <div style='font-size:8px;font-weight:400;margin-top:1mm'>${EMPRESA.direccion}</div>
+  <div style='font-size:8px;font-weight:400'>${EMPRESA.distrito} - ${EMPRESA.provincia} - ${EMPRESA.ciudad}</div>
+  <div style='font-size:8px;font-weight:400'>TEL: ${EMPRESA.telefono}</div>
 </div>
+
+<div class='sep'></div>
+
+<div class='c'>
+  <div style='font-size:10px;font-weight:900'>RUC: ${EMPRESA.ruc}</div>
+</div>
+
+<div class='sep'></div>
 
 <div class='sep2'></div>
 
 <!-- ═══ TIPO DE COMPROBANTE ═══ -->
 <div class='c'>
-  <div style='font-size:13px;font-weight:900;letter-spacing:2px;border:2px solid #000;display:inline-block;padding:2mm 4mm;margin:2mm 0'>${esFactura ? 'FACTURA' : 'BOLETA'} DE VENTA</div>
-  <div style='font-size:11px;font-weight:900;margin-top:1.5mm'>N° ${ventaRegistrada.serie}</div>
+  <div style='font-size:11px;font-weight:900;letter-spacing:1px'>${esFactura ? 'FACTURA' : 'BOLETA'} ELECTRÓNICA</div>
+  <div style='font-size:12px;font-weight:900;margin-top:1mm'>${ventaRegistrada.serie}</div>
 </div>
+
+<div class='sep'></div>
 
 <div class='sep2'></div>
 
 <!-- ═══ DATOS DEL CLIENTE ═══ -->
-<div style='margin-bottom:2.5mm'>
-  <div style='font-size:9px;font-weight:900;letter-spacing:1px;color:#000;margin-bottom:1.5mm'>DATOS DEL CLIENTE</div>
-  <div style='font-size:10px;font-weight:700;line-height:1.8'>
-    <div class='row'><span style='color:#333'>Cliente:</span><span class='b'>${ventaRegistrada.clienteNombre || 'CLIENTE VARIOS'}</span></div>
-    <div class='row'><span style='color:#333'>${esFactura ? 'RUC' : 'DNI'}:</span><span class='b'>${ventaRegistrada.clienteDoc || '---'}</span></div>
-    ${ventaRegistrada.clienteDireccion ? `<div class='row'><span style='color:#333'>Dir:</span><span>${ventaRegistrada.clienteDireccion}</span></div>` : ''}
-    ${ventaRegistrada.clientePlaca ? `<div class='row'><span style='color:#333'>Placa:</span><span class='b'>${ventaRegistrada.clientePlaca}</span></div>` : ''}
+<div style='margin-bottom:2mm'>
+  <div style='font-size:9px;font-weight:900;line-height:1.8'>
+    <div class='row-label'><span class='label'>CLIENTE</span><span>: ${ventaRegistrada.clienteNombre || 'CLIENTE VARIOS'}</span></div>
+    <div class='row-label'><span class='label'>${esFactura ? 'RUC' : 'DNI'}</span><span>: ${ventaRegistrada.clienteDoc || '---'}</span></div>
+    ${ventaRegistrada.clienteDireccion ? `<div class='row-label'><span class='label'>DIRECCIÓN</span><span>: ${ventaRegistrada.clienteDireccion}</span></div>` : ''}
+    ${ventaRegistrada.clientePlaca ? `<div class='row-label'><span class='label'>PLACA</span><span>: ${ventaRegistrada.clientePlaca}</span></div>` : ''}
   </div>
 </div>
 
 <div class='sep3'></div>
 
 <!-- ═══ FECHA Y HORA ═══ -->
-<div class='row' style='font-size:10px;font-weight:700'>
-  <span style='color:#333'>Fecha:</span><span class='b'>${fecha}</span>
-</div>
-<div class='row' style='font-size:10px;font-weight:700'>
-  <span style='color:#333'>Hora:</span><span class='b'>${hora}</span>
+<div style='font-size:9px;font-weight:400;line-height:1.6'>
+  <div class='row-label'><span class='label'>F. EMISIÓN</span><span>: ${fecha}</span><span style='margin-left:auto;font-weight:900'>HORA: ${hora}</span></div>
+  <div class='row-label'><span class='label'>MONEDA</span><span>: SOLES</span></div>
 </div>
 
 <div class='sep'></div>
@@ -3092,6 +3103,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
         { id: 3, fecha: formatFechaCorta(new Date()), hora: '09:05', producto: 'Diésel B5', cant: '40.00 gal', precioUnitario: 23.10, total: 924.00, metodo: 'Tarjeta', comp: 'Factura' },
       ]);
       const [metodoEditando, setMetodoEditando] = useState(null);
+      const [sidebarOpen, setSidebarOpen] = useState(false);
       const trabajadoresGlobal = useMemo(() => { try { const s = localStorage.getItem('grifos_kala_trabajadores'); return s ? JSON.parse(s) : TRABAJADORES_INIT; } catch { return TRABAJADORES_INIT; } }, []);
       const maquinasGlobal = useMemo(() => { try { const s = localStorage.getItem('grifos_kala_maquinas'); return s ? JSON.parse(s) : MAQUINAS_INIT; } catch { return MAQUINAS_INIT; } }, []);
       useEffect(() => { const t = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(t); }, []);
@@ -3170,6 +3182,16 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
           ))}
         </div>
 
+        {/* ===== MOBILE SIDEBAR TOGGLE ===== */}
+        {isMobile && (
+          <div style={{ padding: '8px 12px', display: 'flex', gap: 8 }}>
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} type="button" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 12px', borderRadius: 10, border: `1px solid ${sidebarOpen ? C.amber : C.border}`, background: sidebarOpen ? C.amberSoft : C.panel, color: sidebarOpen ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
+              <WI.Receipt size={16} /> {sidebarOpen ? 'Ocultar resumen' : 'Ver resumen del turno'}
+              <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, color: C.amber }}>{money(montoTotal)}</span>
+            </button>
+          </div>
+        )}
+
         {/* ===== CONTENT ===== */}
         <div style={{ flex: 1, padding: isMobile ? '12px' : '20px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 340px', gap: isMobile ? 12 : 20, maxWidth: 1200, margin: '0 auto', width: '100%', paddingBottom: isMobile ? '80px' : '20px' }}>
           {/* LEFT: Main content */}
@@ -3181,8 +3203,8 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
             )}
           </div>
 
-          {/* RIGHT: Sidebar - Hidden on mobile, shown as bottom section */}
-          {!isMobile && (<div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* RIGHT: Sidebar - Collapsible on mobile */}
+          {(isMobile ? sidebarOpen : true) && (<div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
             {/* Turno card */}
             <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -3227,7 +3249,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
                 </div>
               )}
             </div>
-          </div>)}
+          </div>)})}
         </div>
       </div>);
     }
