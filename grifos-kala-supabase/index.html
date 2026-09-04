@@ -3261,22 +3261,24 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
       const [usuario, setUsuario] = useState('');
       const [seccion, setSeccion] = useState('resumen');
       const [estacion, setEstacion] = useState(ESTACIONES[0]);
-      const [palette, setPalette] = useState(DARK);
       const isMobile = useIsMobile();
+      // Theme is applied synchronously on every render so no component ever paints with a stale
+      // palette. The App itself is NOT remounted on theme change (no key), which keeps the
+      // session state (screen/usuario/rol) intact when the user toggles the color tone.
+      const palette = themeDark ? DARK : LIGHT;
+      C = palette;
+      PRODUCTOS_BASE.forEach(p => {
+        const idx = PRODUCTOS.findIndex(pp => pp.id === p.id);
+        if (idx >= 0) {
+          const col = PRODUCTOS_COLORS[p.id] || {};
+          const tc = palette === DARK ? col.dark : col.light;
+          if (tc) PRODUCTOS[idx] = { ...PRODUCTOS[idx], color: tc.color, soft: tc.soft };
+        }
+      });
       useEffect(() => {
-        C = palette;
         document.body.style.background = palette.bg;
-        // Sync product colors with current theme
-        PRODUCTOS_BASE.forEach(p => {
-          const idx = PRODUCTOS.findIndex(pp => pp.id === p.id);
-          if (idx >= 0) {
-            const col = PRODUCTOS_COLORS[p.id] || {};
-            const tc = palette === DARK ? col.dark : col.light;
-            if (tc) PRODUCTOS[idx] = { ...PRODUCTOS[idx], color: tc.color, soft: tc.soft };
-          }
-        });
       }, [palette]);
-      function toggleTheme() { setThemeDark(prev => { const next = !prev; setPalette(next ? DARK : LIGHT); return next; }); }
+      function toggleTheme() { setThemeDark(!themeDark); }
       const [ventas, setVentas] = useState([
         { fecha: formatFechaCorta(new Date()), hora: '08:15', producto: 'Diésel B5', cant: '45.20 gal', precioUnitario: 23.10, total: 1044.12, metodo: 'Efectivo', comp: 'Boleta', serieBoleta: 'B001-00123', serieFactura: null, ruc: null, razonSocial: null, dniCliente: '48562190', nombreCliente: 'Milagros Condori', placa: null, items: [{ producto: 'Diésel B5', cant: '45.20 gal', precioUnitario: 23.10, total: 1044.12 }], itemCount: 1, esBancarizacion: false, trabajador: 'Milagros Condori' },
         { fecha: formatFechaCorta(new Date()), hora: '09:32', producto: 'Gasolina Regular', cant: '30.00 gal', precioUnitario: 19.90, total: 597.00, metodo: 'Yape', comp: 'Boleta', serieBoleta: 'B001-00124', serieFactura: null, ruc: null, razonSocial: null, dniCliente: '76901234', nombreCliente: 'Edwin Mamani', placa: 'ABC-123', items: [{ producto: 'Gasolina Regular', cant: '30.00 gal', precioUnitario: 19.90, total: 597.00 }], itemCount: 1, esBancarizacion: false, trabajador: 'Milagros Condori' },
@@ -3337,10 +3339,9 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
 
     /* ===================== RENDER ===================== */
     window.onerror = function(msg, src, line, col, err) { document.getElementById('root').innerHTML = '<div style="padding:20px;color:#f44;font-family:monospace;background:#1a1a1a;min-height:100vh"><h2>❌ Error</h2><pre style="white-space:pre-wrap;margin-top:10px;font-size:13px">' + msg + '\nLine: ' + line + ':' + col + '\n' + (err && err.stack ? err.stack : '') + '</pre></div>'; };
-    // key on App forces full re-mount when theme changes, so all components pick up new PRODUCTOS colors
     function AppWrapper() {
       const [themeDark, setThemeDark] = useState(true);
-      return <App key={themeDark ? 'dark' : 'light'} themeDark={themeDark} setThemeDark={setThemeDark} />;
+      return <App themeDark={themeDark} setThemeDark={setThemeDark} />;
     }
     ReactDOM.createRoot(document.getElementById('root')).render(<AppWrapper />);
   </script>
