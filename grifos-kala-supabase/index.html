@@ -3315,7 +3315,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
                 {ESTACIONES.map(e => <option key={e} value={e} style={{ background: C.panel }}>{e}</option>)}
               </select>
               <button onClick={toggleTheme} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: isMobile ? '8px 10px' : '7px 14px', borderRadius: 8, background: C.amberSoft, border: `1.5px solid ${C.amber}`, color: C.amber, cursor: 'pointer', fontFamily: 'Inter', fontSize: isMobile ? 11 : 12, fontWeight: 600, minHeight: 36, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                <I.Sun size={14} color={C.amber} /> {themeDark ? 'Claro' : 'Oscuro'}
+                <WI.Sun size={14} color={C.amber} /> {themeDark ? 'Claro' : 'Oscuro'}
               </button>
               <button onClick={() => setScreen('login')} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? '8px 10px' : '7px 14px', color: C.red, cursor: 'pointer', fontFamily: 'Inter', fontSize: isMobile ? 11 : 12, fontWeight: 600, minHeight: 36, flexShrink: 0, whiteSpace: 'nowrap' }}>
                 <I.LogOut size={14} color={C.red} /> {!isMobile && 'Salir'}
