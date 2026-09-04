@@ -3134,7 +3134,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
       const isMobile = useIsMobile();
       return (<div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column' }}>
         {/* ===== TOP BAR ===== */}
-        <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: isMobile ? '10px 12px' : '12px 20px', display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+        <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: isMobile ? '10px 12px' : '12px 20px', display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16, flexWrap: 'nowrap' }}>
           <div style={{ flexShrink: 0 }}><Logo /></div>
           {!isMobile && (<>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, fontFamily: 'Inter', fontSize: 12.5, color: C.textDim }}>
@@ -3149,16 +3149,16 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
               {nombreMostrar} · Trabajador
             </div>
           </>)}
-          {isMobile && (<div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Inter', fontSize: 11, color: C.textDim }}>
+          {isMobile && (<div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Inter', fontSize: 11, color: C.textDim, minWidth: 0, overflow: 'hidden' }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, flexShrink: 0 }} />
-              <span className='truncate'>{nombreMostrar}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombreMostrar}</span>
             </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={onToggleTheme} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 8, background: C.amberSoft, border: `1.5px solid ${C.amber}`, color: C.amber, cursor: 'pointer', fontFamily: 'Inter', fontSize: 11, fontWeight: 600, minHeight: 40 }}>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <button onClick={onToggleTheme} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 10px', borderRadius: 8, background: C.amberSoft, border: `1.5px solid ${C.amber}`, color: C.amber, cursor: 'pointer', fontFamily: 'Inter', fontSize: 11, fontWeight: 600, minHeight: 40, flexShrink: 0, whiteSpace: 'nowrap' }}>
                 <WI.Sun size={15} /> {themeDark ? 'Claro' : 'Oscuro'}
               </button>
-              <button onClick={onLogout} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 8, background: 'none', border: `1px solid ${C.border}`, color: C.red, cursor: 'pointer', fontFamily: 'Inter', fontSize: 11, fontWeight: 600, minHeight: 40 }}>
+              <button onClick={onLogout} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 10px', borderRadius: 8, background: 'none', border: `1px solid ${C.border}`, color: C.red, cursor: 'pointer', fontFamily: 'Inter', fontSize: 11, fontWeight: 600, minHeight: 40, flexShrink: 0, whiteSpace: 'nowrap' }}>
                 <WI.LogOut size={15} /> Salir
               </button>
             </div>
@@ -3308,16 +3308,16 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
       return (<div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column' }}>
         {/* TOP BAR */}
         <div style={{ background: C.panel, borderBottom: `1px solid ${C.border}`, padding: isMobile ? '10px 12px' : '12px 20px' }}>
-          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? 8 : 12 }}>
-            <div style={{ flexShrink: 0 }}><Logo /></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <select value={estacion} onChange={e => setEstacion(e.target.value)} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? '8px 10px' : '7px 12px', color: C.text, fontFamily: 'Inter', fontSize: isMobile ? 11 : 12.5, cursor: 'pointer', minWidth: isMobile ? 100 : 'auto' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: isMobile ? 8 : 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}><Logo /><span style={{ fontFamily: 'Inter', fontSize: isMobile ? 11 : 12.5, color: C.textDim }}><I.Building2 size={14} color={C.muted} /> {estacion}</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 12, flexWrap: 'nowrap' }}>
+              <select value={estacion} onChange={e => setEstacion(e.target.value)} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? '8px 10px' : '7px 12px', color: C.text, fontFamily: 'Inter', fontSize: isMobile ? 11 : 12.5, cursor: 'pointer', minWidth: isMobile ? 90 : 'auto', flexShrink: 0 }}>
                 {ESTACIONES.map(e => <option key={e} value={e} style={{ background: C.panel }}>{e}</option>)}
               </select>
-              <button onClick={toggleTheme} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: isMobile ? '8px 12px' : '7px 14px', borderRadius: 8, background: C.amberSoft, border: `1.5px solid ${C.amber}`, color: C.amber, cursor: 'pointer', fontFamily: 'Inter', fontSize: isMobile ? 11 : 12, fontWeight: 600, minHeight: 36 }}>
+              <button onClick={toggleTheme} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: isMobile ? '8px 10px' : '7px 14px', borderRadius: 8, background: C.amberSoft, border: `1.5px solid ${C.amber}`, color: C.amber, cursor: 'pointer', fontFamily: 'Inter', fontSize: isMobile ? 11 : 12, fontWeight: 600, minHeight: 36, flexShrink: 0, whiteSpace: 'nowrap' }}>
                 <I.Sun size={14} color={C.amber} /> {themeDark ? 'Claro' : 'Oscuro'}
               </button>
-              <button onClick={() => setScreen('login')} type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? '8px 12px' : '7px 14px', color: C.red, cursor: 'pointer', fontFamily: 'Inter', fontSize: isMobile ? 11 : 12, fontWeight: 600, minHeight: 36 }}>
+              <button onClick={() => setScreen('login')} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? '8px 10px' : '7px 14px', color: C.red, cursor: 'pointer', fontFamily: 'Inter', fontSize: isMobile ? 11 : 12, fontWeight: 600, minHeight: 36, flexShrink: 0, whiteSpace: 'nowrap' }}>
                 <I.LogOut size={14} color={C.red} /> {!isMobile && 'Salir'}
               </button>
             </div>
