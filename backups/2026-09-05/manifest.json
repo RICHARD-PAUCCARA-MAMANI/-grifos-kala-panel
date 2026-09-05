@@ -1,0 +1,22 @@
+{
+  "name": "Grifos Kala - Panel de Operaciones",
+  "short_name": "Grifos Kala",
+  "description": "Sistema de gestión para estaciones de servicio",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12161A",
+  "theme_color": "#E8A33D",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23E8A33D'/><text x='96' y='130' font-size='100' text-anchor='middle' fill='%2312161A'>⛽</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23E8A33D'/><text x='256' y='340' font-size='260' text-anchor='middle' fill='%2312161A'>⛽</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
