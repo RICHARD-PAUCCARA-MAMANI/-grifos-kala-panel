@@ -2095,7 +2095,14 @@
       }
 
       function imprimirComprobante(ventaRegistrada) {
-        const w = window.open('', '_blank', 'width=320,height=800');
+        // printerSize: '58' | '80' | 'a4'
+        const size = printerSize;
+        const isA4 = size === 'a4';
+        const bodyWidth = size === '58' ? '52mm' : size === '80' ? '72mm' : '180mm';
+        const pageWidth = size === '58' ? '58mm' : size === '80' ? '80mm' : 'A4';
+        const popupW = isA4 ? 900 : 400;
+        const popupH = isA4 ? 1100 : 900;
+        const w = window.open('', '_blank', `width=${popupW},height=${popupH}`);
         const now = new Date();
         const fecha = now.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
         const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
@@ -2103,127 +2110,132 @@
         const sub = (ventaRegistrada.total / 1.18);
         const igv = (ventaRegistrada.total - sub);
 
+        // Scale factor: 58mm=1, 80mm=1.25, A4=2.2
+        const s = size === '58' ? 1 : size === '80' ? 1.25 : 2.2;
+
         let itemsHtml = '';
         ventaRegistrada.items.forEach(it => {
-          itemsHtml += `<tr style='border-bottom:1.5px dotted #999'>
-            <td style='padding:2mm 0;font-weight:800;font-size:10px'>${it.producto}</td>
-            <td style='padding:2mm 0;text-align:right;font-weight:900;font-size:11px;white-space:nowrap'>S/ ${it.total.toFixed(2)}</td>
+          itemsHtml += `<tr style='border-bottom:${1.5*s}px dotted #999'>
+            <td style='padding:${2*s}mm 0;font-weight:800;font-size:${10*s}px'>${it.producto}</td>
+            <td style='padding:${2*s}mm 0;text-align:right;font-weight:900;font-size:${11*s}px;white-space:nowrap'>S/ ${it.total.toFixed(2)}</td>
           </tr>
           <tr style='border-bottom:none'>
-            <td style='padding:0 0 2mm 2mm;font-size:8px;color:#333;font-weight:700' colspan='2'>${parseFloat(it.cant).toFixed(2)} ${it.unidad || 'gal'} x S/ ${it.precioUnitario.toFixed(2)}</td>
+            <td style='padding:0 0 ${2*s}mm ${2*s}mm;font-size:${8*s}px;color:#333;font-weight:700' colspan='2'>${parseFloat(it.cant).toFixed(2)} ${it.unidad || 'gal'} x S/ ${it.precioUnitario.toFixed(2)}</td>
           </tr>`;
         });
 
+        const fontStack = isA4 ? "'Georgia', 'Palatino Linotype', 'Book Antiqua', Palatino, serif" : "'Arial Narrow', Impact, 'Arial Black', 'Helvetica Neue', Arial, sans-serif";
+        const padBody = isA4 ? '15mm 20mm' : `${3*s}mm ${3*s}mm`;
+
         w.document.write(`<!DOCTYPE html><html><head><meta charset='utf-8'><title>Comprobante</title>
+<link href='https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;600;700;900&display=swap' rel='stylesheet'>
 <style>
-  @page { size: 58mm auto; margin: 0; }
+  @page { size: ${pageWidth} auto; margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Arial Narrow', Impact, 'Arial Black', 'Helvetica Neue', Arial, sans-serif; padding: 2mm 3mm; width: 52mm; font-size: 9px; font-weight: 400; color: #000; background: #fff; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: 0.2px; }
+  body { font-family: ${fontStack}; padding: ${padBody}; width: ${bodyWidth}; font-size: ${9*s}px; font-weight: 400; color: #000; background: #fff; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: ${0.2*s}px; }
   .c { text-align: center; }
   .b { font-weight: 700; }
-  .sep { border-top: 1px dashed #000; margin: 2mm 0; }
-  .sep2 { border-top: 2px solid #000; margin: 2mm 0; }
-  .sep3 { border-top: 1px solid #999; margin: 1.5mm 0; }
+  .sep { border-top: ${1*s}px dashed #000; margin: ${2*s}mm 0; }
+  .sep2 { border-top: ${2.5*s}px solid #000; margin: ${2*s}mm 0; }
+  .sep3 { border-top: ${1*s}px solid #999; margin: ${1.5*s}mm 0; }
   .row { display: flex; justify-content: space-between; align-items: baseline; }
-  .row-label { display: flex; gap: 2mm; align-items: baseline; }
+  .row-label { display: flex; gap: ${2*s}mm; align-items: baseline; }
   .label { font-weight: 700; text-transform: uppercase; white-space: nowrap; }
-  .small { font-size: 7px; font-weight: 400; }
-  .big { font-size: 12px; font-weight: 700; }
-  .total-box { border: 1.5px solid #000; padding: 2mm 3mm; margin: 2mm 0; }
-  .total-row { font-size: 11px; font-weight: 700; }
+  .small { font-size: ${7*s}px; font-weight: 400; }
+  .big { font-size: ${12*s}px; font-weight: 700; }
+  .total-box { border: ${2*s}px solid #000; padding: ${2*s}mm ${3*s}mm; margin: ${2*s}mm 0; }
+  .total-row { font-size: ${12*s}px; font-weight: 900; }
   table { width: 100%; border-collapse: collapse; }
-  th { font-size: 7px; font-weight: 700; text-transform: uppercase; border-bottom: 1px solid #000; padding: 1mm 0; text-align: left; }
-  td { padding: 0.8mm 0; font-size: 8px; font-weight: 400; }
+  th { font-size: ${7*s}px; font-weight: 700; text-transform: uppercase; border-bottom: ${1*s}px solid #000; padding: ${1*s}mm 0; text-align: left; }
+  td { padding: ${0.8*s}mm 0; font-size: ${8*s}px; font-weight: 400; }
   .th-r { text-align: right; }
   .td-r { text-align: right; }
-  .cut { border-top: 1.5px dashed #000; margin-top: 3mm; padding-top: 2mm; text-align: center; font-size: 7px; color: #666; }
-  @media print { body { padding: 2mm 3mm; width: 52mm; } }
+  .cut { border-top: ${1.5*s}px dashed #000; margin-top: ${3*s}mm; padding-top: ${2*s}mm; text-align: center; font-size: ${7*s}px; color: #666; }
+  @media print { body { padding: ${padBody}; width: ${bodyWidth}; } }
 </style></head><body>
 
 <!-- ═══ ENCABEZADO ═══ -->
 <div class='c'>
-  <div style='font-size:18px;font-weight:900;letter-spacing:1px'>GRIFOS KALA</div>
-  <div style='font-size:9px;font-weight:900;margin-top:1mm'>${EMPRESA.razonSocial}</div>
-  <div style='font-size:8px;font-weight:400;margin-top:1mm'>${EMPRESA.direccion}</div>
-  <div style='font-size:8px;font-weight:400'>${EMPRESA.distrito} - ${EMPRESA.provincia} - ${EMPRESA.ciudad}</div>
-  <div style='font-size:8px;font-weight:400'>TEL: ${EMPRESA.telefono}</div>
+  <div style='font-family:Playfair Display,Georgia,serif;font-size:${22*s}px;font-weight:900;letter-spacing:${1*s}px;color:#1a1a1a'>GRIFOS KALA</div>
+  <div style='font-size:${10*s}px;font-weight:900;margin-top:${1*s}mm;color:#333'>${EMPRESA.razonSocial}</div>
+  <div style='font-size:${8*s}px;font-weight:400;margin-top:${1*s}mm;color:#555'>${EMPRESA.direccion}</div>
+  <div style='font-size:${8*s}px;font-weight:400;color:#555'>${EMPRESA.distrito} - ${EMPRESA.provincia} - ${EMPRESA.ciudad}</div>
+  <div style='font-size:${8*s}px;font-weight:600;color:#333'>TEL: ${EMPRESA.telefono}</div>
 </div>
 
 <div class='sep'></div>
 
 <div class='c'>
-  <div style='font-size:10px;font-weight:900'>RUC: ${EMPRESA.ruc}</div>
+  <div style='font-size:${11*s}px;font-weight:900;color:#1a1a1a'>RUC: ${EMPRESA.ruc}</div>
 </div>
 
 <div class='sep'></div>
-
 <div class='sep2'></div>
 
 <!-- ═══ TIPO DE COMPROBANTE ═══ -->
 <div class='c'>
-  <div style='font-size:11px;font-weight:900;letter-spacing:1px'>${esFactura ? 'FACTURA' : 'BOLETA'} ELECTRÓNICA</div>
-  <div style='font-size:12px;font-weight:900;margin-top:1mm'>${ventaRegistrada.serie}</div>
+  <div style='font-family:Playfair Display,Georgia,serif;font-size:${13*s}px;font-weight:900;letter-spacing:${1.5*s}px;color:#1a1a1a'>${esFactura ? 'FACTURA' : 'BOLETA'} ELECTRÓNICA</div>
+  <div style='font-size:${14*s}px;font-weight:900;margin-top:${1*s}mm;color:#000'>${ventaRegistrada.serie}</div>
 </div>
 
 <div class='sep'></div>
-
 <div class='sep2'></div>
 
 <!-- ═══ DATOS DEL CLIENTE ═══ -->
-<div style='margin-bottom:2mm'>
-  <div style='font-size:9px;font-weight:900;line-height:1.8'>
-    <div class='row-label'><span class='label'>CLIENTE</span><span>: ${ventaRegistrada.clienteNombre || 'CLIENTE VARIOS'}</span></div>
-    <div class='row-label'><span class='label'>${esFactura ? 'RUC' : 'DNI'}</span><span>: ${ventaRegistrada.clienteDoc || '---'}</span></div>
-    ${ventaRegistrada.clienteDireccion ? `<div class='row-label'><span class='label'>DIRECCIÓN</span><span>: ${ventaRegistrada.clienteDireccion}</span></div>` : ''}
-    ${ventaRegistrada.clientePlaca ? `<div class='row-label'><span class='label'>PLACA</span><span>: ${ventaRegistrada.clientePlaca}</span></div>` : ''}
+<div style='margin-bottom:${2*s}mm'>
+  <div style='font-size:${10*s}px;font-weight:700;line-height:2;color:#1a1a1a'>
+    <div class='row-label'><span class='label'>CLIENTE</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clienteNombre || 'CLIENTE VARIOS'}</span></div>
+    <div class='row-label'><span class='label'>${esFactura ? 'RUC' : 'DNI'}</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clienteDoc || '---'}</span></div>
+    ${ventaRegistrada.clienteDireccion ? `<div class='row-label'><span class='label'>DIRECCIÓN</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clienteDireccion}</span></div>` : ''}
+    ${ventaRegistrada.clientePlaca ? `<div class='row-label'><span class='label'>PLACA</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clientePlaca}</span></div>` : ''}
   </div>
 </div>
 
 <div class='sep3'></div>
 
 <!-- ═══ FECHA Y HORA ═══ -->
-<div style='font-size:9px;font-weight:400;line-height:1.6'>
-  <div class='row-label'><span class='label'>F. EMISIÓN</span><span>: ${fecha}</span><span style='margin-left:auto;font-weight:900'>HORA: ${hora}</span></div>
-  <div class='row-label'><span class='label'>MONEDA</span><span>: SOLES</span></div>
+<div style='font-size:${9*s}px;font-weight:400;line-height:1.6'>
+  <div class='row-label'><span class='label'>F. EMISIÓN</span><span style='color:#333'>: ${fecha}</span><span style='margin-left:auto;font-weight:900'>HORA: ${hora}</span></div>
+  <div class='row-label'><span class='label'>MONEDA</span><span style='color:#333'>: SOLES</span></div>
 </div>
 
 <div class='sep'></div>
 
 <!-- ═══ DETALLE DE PRODUCTOS ═══ -->
-<div style='font-size:9px;font-weight:900;letter-spacing:1px;color:#000;margin-bottom:2mm'>DETALLE DE PRODUCTOS</div>
+<div style='font-size:${10*s}px;font-weight:900;letter-spacing:${1*s}px;color:#1a1a1a;margin-bottom:${2*s}mm'>DETALLE DE PRODUCTOS</div>
 <table>
-  <thead><tr><th class='th' style='text-align:left'>Descripción</th><th class='th' style='text-align:right;width:18mm'>Total</th></tr></thead>
+  <thead><tr><th class='th' style='text-align:left'>Descripción</th><th class='th' style='text-align:right;width:${18*s}mm'>Total</th></tr></thead>
   <tbody>${itemsHtml}</tbody>
 </table>
 
 <div class='sep'></div>
 
 <!-- ═══ TOTALES ═══ -->
-${esFactura ? `<div style='margin-bottom:2mm'>
-  <div class='row' style='font-size:10px;font-weight:700'><span style='color:#333'>Base:</span><span>S/ ${sub.toFixed(2)}</span></div>
-  <div class='row' style='font-size:10px;font-weight:700'><span style='color:#333'>IGV 18%:</span><span>S/ ${igv.toFixed(2)}</span></div>
+${esFactura ? `<div style='margin-bottom:${2*s}mm'>
+  <div class='row' style='font-size:${10*s}px;font-weight:700'><span style='color:#555'>Base:</span><span>S/ ${sub.toFixed(2)}</span></div>
+  <div class='row' style='font-size:${10*s}px;font-weight:700'><span style='color:#555'>IGV 18%:</span><span>S/ ${igv.toFixed(2)}</span></div>
 </div>` : ''}
 <div class='total-box'>
-  <div class='row total-row'><span>TOTAL</span><span>S/ ${ventaRegistrada.total.toFixed(2)}</span></div>
+  <div class='row total-row'><span style='letter-spacing:${1*s}px'>TOTAL</span><span>S/ ${ventaRegistrada.total.toFixed(2)}</span></div>
 </div>
-<div style='font-size:9px;font-weight:700;margin:2mm 0;color:#000;line-height:1.6'>Son: <b>${numeroALetras(ventaRegistrada.total)}</b></div>
+<div style='font-size:${9*s}px;font-weight:600;margin:${2*s}mm 0;color:#333;line-height:1.6'>Son: <b style='color:#000'>${numeroALetras(ventaRegistrada.total)}</b></div>
 
 <div class='sep'></div>
 
 <!-- ═══ FORMA DE PAGO ═══ -->
-<div style='margin-bottom:2.5mm'>
-  <div style='font-size:9px;font-weight:900;letter-spacing:1px;color:#000;margin-bottom:1.5mm'>FORMA DE PAGO</div>
-  <div style='font-size:10px;font-weight:700;line-height:1.8'>
-    <div class='row'><span style='color:#333'>Pago:</span><span class='b'>${ventaRegistrada.metodo}</span></div>
-    <div class='row'><span style='color:#333'>Atendido:</span><span class='b'>${ventaRegistrada.trabajador}</span></div>
+<div style='margin-bottom:${2.5*s}mm'>
+  <div style='font-size:${10*s}px;font-weight:900;letter-spacing:${1*s}px;color:#1a1a1a;margin-bottom:${1.5*s}mm'>FORMA DE PAGO</div>
+  <div style='font-size:${10*s}px;font-weight:700;line-height:1.8'>
+    <div class='row'><span style='color:#555'>Pago:</span><span class='b'>${ventaRegistrada.metodo}</span></div>
+    <div class='row'><span style='color:#555'>Atendido:</span><span class='b'>${ventaRegistrada.trabajador}</span></div>
   </div>
 </div>
 
 <div class='sep'></div>
 
 <!-- ═══ PIE ═══ -->
-<div class='c small' style='line-height:1.6'>Rep. impresa de la ${esFactura ? 'factura' : 'boleta'}<br>electrónica</div>
-<div class='c' style='margin-top:4mm;font-size:12px;font-weight:900;letter-spacing:0.5px'>¡GRACIAS!</div>
+<div class='c small' style='line-height:1.6;color:#666'>Rep. impresa de la ${esFactura ? 'factura' : 'boleta'}<br>electrónica</div>
+<div class='c' style='margin-top:${4*s}mm;font-family:Playfair Display,Georgia,serif;font-size:${14*s}px;font-weight:900;letter-spacing:${0.5*s}px;color:#1a1a1a'>¡GRACIAS!</div>
 
 <div class='cut'>✂ - - - - - - - - - - - - ✂</div>
 
@@ -2346,14 +2358,25 @@ ${esFactura ? `<div style='margin-bottom:2mm'>
         </div>
 
         {/* 5. TOTAL + REGISTRAR */}
-        <div style={{ background: C.amberSoft, border: `2px solid ${C.amber}`, borderRadius: 12, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Total a cobrar</div>
-            <div style={{ fontFamily: 'JetBrains Mono', fontSize: 26, fontWeight: 700, color: C.amber }}>S/ {totalGeneral.toFixed(2)}</div>
+        <div style={{ background: C.amberSoft, border: `2px solid ${C.amber}`, borderRadius: 12, padding: isMobile ? 12 : 16 }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Total a cobrar</div>
+              <div style={{ fontFamily: 'JetBrains Mono', fontSize: isMobile ? 22 : 26, fontWeight: 700, color: C.amber }}>S/ {totalGeneral.toFixed(2)}</div>
+            </div>
+            <button onClick={registrarVenta} disabled={carrito.length === 0} type="button" style={{ padding: isMobile ? '14px 20px' : '12px 28px', borderRadius: 10, background: carrito.length > 0 ? C.amber : C.border, color: carrito.length > 0 ? C.bg : C.muted, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: isMobile ? 13 : 14, cursor: carrito.length > 0 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48 }}>
+              🖨️ Registrar e imprimir
+            </button>
           </div>
-          <button onClick={registrarVenta} disabled={carrito.length === 0} type="button" style={{ padding: '12px 28px', borderRadius: 10, background: carrito.length > 0 ? C.amber : C.border, color: carrito.length > 0 ? C.bg : C.muted, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 14, cursor: carrito.length > 0 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 8 }}>
-            🖨️ Registrar e imprimir
-          </button>
+          {/* Selector de tamaño de papel */}
+          <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, fontWeight: 600 }}>🖨️ Impresora:</span>
+            {[{ id: '58', label: '58mm', desc: 'POS térmica' }, { id: '80', label: '80mm', desc: 'POS amplia' }, { id: 'a4', label: 'A4 / Carta', desc: 'Impresora normal' }].map(opt => (
+              <button key={opt.id} onClick={() => { setPrinterSize(opt.id); localStorage.setItem('grifos_kala_printer', opt.id); }} type="button" style={{ padding: '6px 12px', borderRadius: 6, border: `1.5px solid ${printerSize === opt.id ? C.amber : C.border}`, background: printerSize === opt.id ? C.amberSoft : 'transparent', color: printerSize === opt.id ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {opt.label} <span style={{ fontSize: 9, opacity: 0.7, marginLeft: 2 }}>({opt.desc})</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>);
     }
@@ -2435,6 +2458,10 @@ ${esFactura ? `<div style='margin-bottom:2mm'>
         }));
       }, [maquinasSeleccionadas, maquinasDisponibles]);
 
+      // Paper size for cierre de turno printing
+      const [cierrePrinterSize, setCierrePrinterSize] = useState(() => localStorage.getItem('grifos_kala_cierre_printer') || '58');
+      useEffect(() => { localStorage.setItem('grifos_kala_cierre_printer', cierrePrinterSize); }, [cierrePrinterSize]);
+
       // Total mangueras = TODAS las ventas (efectivo + virtuales)
       const totalMangueras = ventasWorker.reduce((sum, v) => sum + v.total, 0);
       const totalGalonesMangueras = ventasWorker.reduce((sum, v) => {
@@ -2515,9 +2542,8 @@ ${esFactura ? `<div style='margin-bottom:2mm'>
       ];
 
       function imprimirCierreTurno(tipo) {
-        // Térmica: selecciona 'basic 230' | A4: selecciona 'epson l3250 series'
-        // El navegador recuerda la impresora por cada ventana popup
-        const w = window.open('', '_blank', tipo === 'a4' ? 'width=900,height=1100' : 'width=320,height=1200');
+        // 58mm: M1KC POS | 80mm: Basic 230 | A4: Epson L3250
+        const w = window.open('', '_blank', tipo === 'a4' ? 'width=900,height=1100' : tipo === '80' ? 'width=400,height=1200' : 'width=320,height=1200');
         const now = new Date();
         const fecha = now.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: '2-digit' });
         const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
@@ -2576,6 +2602,7 @@ ${esFactura ? `<div style='margin-bottom:2mm'>
 
 
         const isA4 = tipo === 'a4';
+        const is80mm = tipo === '80';
 
         if (isA4) {
           // ============ A4 FORMAT — REPORTE DE CIERRE DE TURNO ============
@@ -2699,43 +2726,50 @@ ${esFactura ? `<div style='margin-bottom:2mm'>
 <div class='footer'>Grifos Kala S.A.C. — RUC: ${EMPRESA.ruc} — Generado el ${fecha} a las ${hora}</div>
 </body></html>`);
         } else {
-          // ============ TÉRMICA POS-D 80mm — REPORTE DE CIERRE DE TURNO ============
+          // ============ TÉRMICA 58mm/80mm — REPORTE DE CIERRE DE TURNO ============
+          const paperW = is80mm ? '74mm' : '52mm';
+          const paperPage = is80mm ? '80mm auto' : '58mm auto';
+          const padSide = is80mm ? '5mm' : '3mm';
+          const hdrSize = is80mm ? '18px' : '14px';
+          const fontSize = is80mm ? '11px' : '10px';
+          const rowFontSize = is80mm ? '11px' : '9px';
+          const sepWidth = is80mm ? '2px' : '1.5px';
+          const bigSize = is80mm ? '22px' : '18px';
           w.document.write(`
 <!DOCTYPE html>
 <html><head><meta charset='utf-8'><title>Cierre de Turno - ${nom}</title>
 <style>
-  @page { size: 58mm auto; margin: 2mm; }
+  @page { size: ${paperPage}; margin: ${padSide}; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', 'Lucida Console', 'Consolas', monospace; padding: 3mm; width: 52mm; font-size: 10px; font-weight: 700; color: #000; background: #fff; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: 0.2px; }
+  body { font-family: 'Consolas', 'Courier New', 'Lucida Console', monospace; padding: ${padSide}; width: ${paperW}; font-size: ${fontSize}; font-weight: 700; color: #000; background: #fff; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: 0.2px; }
   .c { text-align: center; }
   .b { font-weight: 900; }
-  .sep { border-top: 1.5px dashed #000; margin: 2.5mm 0; }
+  .sep { border-top: ${sepWidth} dashed #000; margin: 2.5mm 0; }
   .sep2 { border-top: 2.5px solid #000; margin: 2.5mm 0; }
   .sep3 { border-top: 1px solid #666; margin: 2mm 0; }
   .row { display: flex; justify-content: space-between; }
-  .section { font-size: 9px; font-weight: 900; letter-spacing: 1px; color: #000; margin: 3mm 0 1.5mm; text-transform: uppercase; }
-  .section::after { content: ''; display: block; border-bottom: 1.5px solid #000; margin-top: 1mm; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 2.5mm; font-size: 9px; font-weight: 700; }
-  th { text-align: left; font-weight: 900; border-bottom: 1.5px solid #000; padding: 1.5mm 0; font-size: 8px; letter-spacing: 0.5px; color: #000; text-transform: uppercase; }
+  .section { font-size: ${rowFontSize}; font-weight: 900; letter-spacing: 1px; color: #000; margin: 3mm 0 1.5mm; text-transform: uppercase; }
+  .section::after { content: ''; display: block; border-bottom: ${sepWidth} solid #000; margin-top: 1mm; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 2.5mm; font-size: ${rowFontSize}; font-weight: 700; }
+  th { text-align: left; font-weight: 900; border-bottom: ${sepWidth} solid #000; padding: 1.5mm 0; font-size: ${is80mm ? '9px' : '8px'}; letter-spacing: 0.5px; color: #000; text-transform: uppercase; }
   td { padding: 1.5mm 0; border-bottom: 1px dotted #999; }
-  .total-row td { border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 2mm 0; font-weight: 900; }
+  .total-row td { border-top: ${sepWidth} solid #000; border-bottom: ${sepWidth} solid #000; padding: 2mm 0; font-weight: 900; }
   .summary-box { border: 2.5px solid #000; padding: 2.5mm 3mm; margin: 2.5mm 0; background: #f5f5f5; }
-  .big { font-size: 18px; font-weight: 900; }
-  .small { font-size: 8px; color: #333; font-weight: 600; }
-  .cut { border-top: 2.5px dashed #000; margin-top: 4mm; padding-top: 3mm; text-align: center; font-size: 9px; color: #666; font-weight: 600; }
-  @media print { body { padding: 2mm; width: 54mm; } }
+  .big { font-size: ${bigSize}; font-weight: 900; }
+  .small { font-size: ${is80mm ? '9px' : '8px'}; color: #333; font-weight: 600; }
+  .cut { border-top: 2.5px dashed #000; margin-top: 4mm; padding-top: 3mm; text-align: center; font-size: ${rowFontSize}; color: #666; font-weight: 600; }
+  @media print { body { padding: ${padSide}; width: ${paperW}; } }
 </style></head><body>
 
 <!-- ═══ ENCABEZADO ═══ -->
 <div class='c'>
-  <div style='font-size:14px;font-weight:900;letter-spacing:2px'>⛽ GRIFOS KALA</div>
-  <div style='font-size:9px;font-weight:700;margin-top:1.5mm;color:#222'>CIERRE DE TURNO</div>
+  <div style='font-size:${hdrSize};font-weight:900;letter-spacing:2px'>⛽ GRIFOS KALA</div>
+  <div style='font-size:${is80mm ? '11px' : '9px'};font-weight:700;margin-top:1.5mm;color:#222'>CIERRE DE TURNO</div>
 </div>
 
 <div class='sep2'></div>
 
-<!-- ═══ DATOS DEL TURNO ═══ -->
-<div style='font-size:9px;font-weight:700;line-height:1.8'>
+<!-- ═══ DATOS DEL TURNO ═══ -->  <div style='font-size:${rowFontSize};font-weight:700;line-height:1.8'>
   <div class='row'><span style='color:#333'>Fecha:</span><span class='b'>${fecha}</span></div>
   <div class='row'><span style='color:#333'>Trabajador:</span><span class='b'>${nom}</span></div>
   <div class='row'><span style='color:#333'>Estación:</span><span class='b'>${estacion}</span></div>
@@ -3076,14 +3110,25 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
               <div style={{ fontFamily: 'Inter', fontSize: 13, color: C.muted, marginBottom: 2 }}>EFECTIVO QUE DEBE TENER EL TRABAJADOR</div>
               <div style={{ fontFamily: 'JetBrains Mono', fontSize: 30, fontWeight: 700, color: efectivoFijo >= 0 ? C.green : C.red }}>{money(efectivoFijo)}</div>
             </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <button onClick={() => imprimirCierreTurno('termica')} type="button" style={{ padding: '12px 18px', borderRadius: 10, background: 'none', border: `2px solid ${C.teal}`, color: C.teal, fontFamily: 'Inter', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                🧾 Imprimir térmica
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {/* Paper size selector */}
+              <div style={{ display: 'flex', gap: 4, background: C.bg, borderRadius: 8, padding: 3, border: `1px solid ${C.border}` }}>
+                {[
+                  { id: '58', label: '58mm' },
+                  { id: '80', label: '80mm' },
+                  { id: 'a4', label: 'A4' }
+                ].map(s => (
+                  <button key={s.id} onClick={() => setCierrePrinterSize(s.id)} type="button" style={{
+                    padding: '6px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontFamily: 'Inter', fontSize: 11, fontWeight: 700, transition: 'all 0.15s',
+                    background: cierrePrinterSize === s.id ? C.amber : 'transparent',
+                    color: cierrePrinterSize === s.id ? C.bg : C.muted
+                  }}>{s.label}</button>
+                ))}
+              </div>
+              <button onClick={() => imprimirCierreTurno(cierrePrinterSize)} type="button" style={{ padding: '10px 16px', borderRadius: 10, background: `linear-gradient(135deg, ${C.amber}, ${C.amber}dd)`, color: C.bg, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                🧾 Imprimir
               </button>
-              <button onClick={() => imprimirCierreTurno('a4')} type="button" style={{ padding: '12px 18px', borderRadius: 10, background: 'none', border: `2px solid ${C.amber}`, color: C.amber, fontFamily: 'Inter', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                📄 Imprimir A4
-              </button>
-              <button type="button" style={{ padding: '14px 32px', borderRadius: 10, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button type="button" style={{ padding: '10px 16px', borderRadius: 10, background: C.green, color: C.bg, border: 'none', fontFamily: 'Inter', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <WI.FileText size={16} /> Cerrar turno
               </button>
             </div>
@@ -3104,6 +3149,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
       ]);
       const [metodoEditando, setMetodoEditando] = useState(null);
       const [sidebarOpen, setSidebarOpen] = useState(false);
+      const [printerSize, setPrinterSize] = useState(() => localStorage.getItem('grifos_kala_printer') || '58');
       const trabajadoresGlobal = useMemo(() => { try { const s = localStorage.getItem('grifos_kala_trabajadores'); return s ? JSON.parse(s) : TRABAJADORES_INIT; } catch { return TRABAJADORES_INIT; } }, []);
       const maquinasGlobal = useMemo(() => { try { const s = localStorage.getItem('grifos_kala_maquinas'); return s ? JSON.parse(s) : MAQUINAS_INIT; } catch { return MAQUINAS_INIT; } }, []);
       useEffect(() => { const t = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(t); }, []);
