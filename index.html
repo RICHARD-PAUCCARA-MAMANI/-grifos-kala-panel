@@ -2463,12 +2463,9 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
       const [cierrePrinterSize, setCierrePrinterSize] = useState(() => localStorage.getItem('grifos_kala_cierre_printer') || '58');
       useEffect(() => { localStorage.setItem('grifos_kala_cierre_printer', cierrePrinterSize); }, [cierrePrinterSize]);
 
-      // Total mangueras = TODAS las ventas (efectivo + virtuales)
-      const totalMangueras = ventasWorker.reduce((sum, v) => sum + v.total, 0);
-      const totalGalonesMangueras = ventasWorker.reduce((sum, v) => {
-        const gal = parseFloat(v.cant) || 0;
-        return sum + gal;
-      }, 0);
+      // Total mangueras = SUMA de todos los productos leidos en mangueras
+      const totalMangueras = productosVisibles.reduce((sum, p) => sum + calcularMontoProducto(p.id), 0);
+      const totalGalonesMangueras = productosVisibles.reduce((sum, p) => sum + calcularGalones(p.id), 0);
 
       // Ventas virtuales (no efectivo)
       const [ventasVirtuales, setVentasVirtuales] = useState(() =>
