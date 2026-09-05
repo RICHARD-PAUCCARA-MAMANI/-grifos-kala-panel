@@ -1995,6 +1995,7 @@
     /* ===================== WORKER: NUEVA VENTA ===================== */
     function WorkerNuevaVenta({ usuario, estacion, ventasWorker, setVentasWorker }) {
       const isMobile = useIsMobile();
+      const [printerSize, setPrinterSize] = useState(() => localStorage.getItem('grifos_kala_printer') || '58');
 
       const [precioTick, setPrecioTick] = useState(0);
       // Sincronizar precios desde localStorage (actualizados por Admin)
