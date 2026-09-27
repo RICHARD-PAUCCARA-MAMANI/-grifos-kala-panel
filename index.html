@@ -1480,7 +1480,7 @@
         setEditando(t.id);
         setFNombre(t.nombre); setFDni(t.dni); setFUsuario(t.usuario);
         setFEstacion(t.estacion);
-        setFHorario(t.horario.map(h => ({ ...h })));
+        setFHorario((t.horario || DIAS.map(d => ({ dia: d, libre: true, ini: '06:00', fin: '14:00' }))).map(h => ({ ...h })));
         setFMaquinas(t.maquinasAsignadas || []);
         setShowModal(true);
       }
@@ -1563,7 +1563,7 @@
           {trabajadoresFiltrados.map(t => {
             const expand = expandedId === t.id;
             const maqAsignadas = (t.maquinasAsignadas || []).map(id => maquinas.find(m => m.id === id)).filter(Boolean);
-            const horasTrabajo = t.horario.filter(h => !h.libre).length * 8;
+            const horasTrabajo = (t.horario || []).filter(h => !h.libre).length * 8;
             return (<div key={t.id} style={{ background: C.panel, border: `1px solid ${expand ? C.amber : C.border}`, borderRadius: 12, overflow: 'hidden', transition: 'border-color 0.2s' }}>
               <div onClick={() => setExpandedId(expand ? null : t.id)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', cursor: 'pointer' }}>
                 <div style={{ width: 40, height: 40, borderRadius: '50%', background: C.panelLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter', fontWeight: 600, fontSize: 13, color: C.amber, flexShrink: 0 }}>{t.nombre.split(' ').map(n => n[0]).slice(0, 2).join('')}</div>
@@ -1619,7 +1619,7 @@
                     <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.nombre}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                    {t.horario.map(h => (
+                    {(t.horario || []).map(h => (
                       <div key={h.dia} style={{ textAlign: 'center', padding: '4px 6px', borderRadius: 6, minWidth: 48, background: h.libre ? C.panel : C.tealSoft, border: `1px solid ${h.libre ? C.border : C.teal}33` }}>
                         <div style={{ fontFamily: 'Inter', fontSize: 8, color: C.muted, fontWeight: 600 }}>{h.dia}</div>
                         {h.libre ? <div style={{ fontFamily: 'Inter', fontSize: 7, color: C.muted, marginTop: 1 }}>Libre</div> : <div style={{ fontFamily: 'JetBrains Mono', fontSize: 8, color: C.teal, marginTop: 1 }}>{h.ini}</div>}
@@ -1661,7 +1661,7 @@
                   const dayName = DIAS[dayOfWeek];
                   const isToday = day === now.getDate();
                   const workersWorking = trabajadoresFiltrados.filter(t => {
-                    const h = t.horario.find(h => h.dia === dayName);
+                    const h = (t.horario || []).find(h => h.dia === dayName);
                     return h && !h.libre;
                   });
                   const allFree = workersWorking.length === 0;
@@ -1669,7 +1669,7 @@
                     <div style={{ fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: isToday ? 700 : 500, color: isToday ? C.amber : C.text }}>{day}</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 4 }}>
                       {workersWorking.slice(0, 3).map((w, wi) => {
-                        const wh = w.horario.find(h => h.dia === dayName);
+                        const wh = (w.horario || []).find(h => h.dia === dayName);
                         const col = workerColors[w.id % workerColors.length];
                         return (<div key={w.id} style={{ padding: '1px 3px', borderRadius: 3, background: `${col}22`, border: `1px solid ${col}44` }}>
                           <span style={{ fontFamily: 'Inter', fontSize: 7, color: col, fontWeight: 600 }}>{w.nombre.split(' ')[0]}</span>
@@ -2248,7 +2248,7 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
       function registrarVenta() {
         if (carrito.length === 0) return;
         const now = new Date();
-        const serie = tipoComprobante === 'factura' ? 'F001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0') : 'B001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0');
+        const serie = tipoComprobante === 'Factura' ? 'F001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0') : 'B001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0');
         const ventaRegistrada = {
           id: Date.now(),
           fecha: formatFechaCorta(now),
@@ -2467,11 +2467,19 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
       const totalMangueras = productosVisibles.reduce((sum, p) => sum + calcularMontoProducto(p.id), 0);
       const totalGalonesMangueras = productosVisibles.reduce((sum, p) => sum + calcularGalones(p.id), 0);
 
-      // Ventas virtuales (no efectivo)
+      // Ventas virtuales (no efectivo) — sync with ventasWorker
       const [ventasVirtuales, setVentasVirtuales] = useState(() =>
         ventasWorker.filter(v => v.metodo !== 'Efectivo').map(v => ({ ...v }))
       );
       const [metodoEditando, setMetodoEditando] = useState(null);
+      useEffect(() => {
+        setVentasVirtuales(prev => {
+          const prevIds = new Set(prev.map(v => v.id));
+          const nuevas = ventasWorker.filter(v => v.metodo !== 'Efectivo' && !prevIds.has(v.id));
+          if (nuevas.length === 0) return prev;
+          return [...prev, ...nuevas.map(v => ({ ...v }))];
+        });
+      }, [ventasWorker]);
 
       function cambiarMetodoVenta(id, nuevoMetodo) {
         if (nuevoMetodo === 'Efectivo') {
