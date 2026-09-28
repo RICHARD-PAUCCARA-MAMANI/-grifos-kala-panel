@@ -811,6 +811,8 @@
       Plus: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
       Trash2: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
       Download: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+      Pencil: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>,
+      Ban: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>,
       X: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
       AlertTriangle: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>,
       Wallet: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round" className={p.className||""} style={p.style}><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2.276"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>,
@@ -1090,6 +1092,30 @@
       const [valor, setValor] = useState('');
       const [itemsCarrito, setItemsCarrito] = useState([]);
       const [guardado, setGuardado] = useState(false);
+      const [showEditar, setShowEditar] = useState(null);
+      const [editDatos, setEditDatos] = useState(null);
+
+      function abrirEditar(v) {
+        setShowEditar(v);
+        setEditDatos({ comp: v.comp || 'Boleta', serieBoleta: v.serieBoleta || '', serieFactura: v.serieFactura || '', total: v.total || 0, metodo: v.metodo || 'Efectivo', nombreCliente: v.nombreCliente || '', dniCliente: v.dniCliente || '', razonSocial: v.razonSocial || '', ruc: v.ruc || '', placa: v.placa || '', fecha: v.fecha || '', hora: v.hora || '' });
+      }
+      function guardarEdicion() {
+        if (!showEditar || !editDatos) return;
+        const totalNum = parseFloat(editDatos.total) || 0;
+        const esFact = editDatos.comp === 'Factura';
+        const esBol = editDatos.comp === 'Boleta';
+        setVentas(prev => prev.map(x => x === showEditar ? { ...x, comp: editDatos.comp, serieBoleta: esFact ? null : (editDatos.serieBoleta || null), serieFactura: esFact ? (editDatos.serieFactura || null) : null, ruc: esFact ? (editDatos.ruc || null) : null, razonSocial: esFact ? (editDatos.razonSocial || null) : null, dniCliente: esBol ? (editDatos.dniCliente || null) : null, nombreCliente: esBol ? (editDatos.nombreCliente || null) : null, placa: editDatos.placa || null, total: totalNum, metodo: editDatos.metodo, fecha: editDatos.fecha, hora: editDatos.hora } : x));
+        setShowEditar(null); setEditDatos(null);
+      }
+      function anularComprobante(v) {
+        setVentas(prev => prev.map(x => x === v ? { ...x, anulada: !x.anulada } : x));
+        setShowPreview(p => p === v ? { ...p, anulada: !p.anulada } : p);
+      }
+      function eliminarComprobante(v) {
+        if (!window.confirm('¿Eliminar este comprobante definitivamente? Esta acción no se puede deshacer.')) return;
+        setVentas(prev => prev.filter(x => x !== v));
+        if (showPreview === v) setShowPreview(null);
+      }
 
       function agregarItemCarrito() {
         const p = productos.find(pp => pp.id === productoId); const num = parseFloat(valor) || 0;
@@ -1122,10 +1148,10 @@
       const productoActual = productos.find(p => p.id === productoId); const numActual = parseFloat(valor) || 0;
       const trabajadoresUnicos = [...new Set(ventas.map(v => v.trabajador).filter(Boolean))];
       const ventasConComprobante = ventas.filter(v => filtro === 'todos' ? true : filtro === 'boletas' ? v.comp === 'Boleta' : filtro === 'facturas' ? v.comp === 'Factura' : true).filter(v => filtroTrabajador === 'todos' ? true : v.trabajador === filtroTrabajador).filter(v => !busqueda ? true : (v.producto || '').toLowerCase().includes(busqueda.toLowerCase()) || (v.serieBoleta || '').toLowerCase().includes(busqueda.toLowerCase()) || (v.serieFactura || '').toLowerCase().includes(busqueda.toLowerCase()) || (v.trabajador || '').toLowerCase().includes(busqueda.toLowerCase()));
-      const totalBoletas = ventas.filter(v => v.comp === 'Boleta').length;
-      const totalFacturas = ventas.filter(v => v.comp === 'Factura').length;
-      const montoBoletas = ventas.filter(v => v.comp === 'Boleta').reduce((a, v) => a + v.total, 0);
-      const montoFacturas = ventas.filter(v => v.comp === 'Factura').reduce((a, v) => a + v.total, 0);
+      const totalBoletas = ventas.filter(v => v.comp === 'Boleta' && !v.anulada).length;
+      const totalFacturas = ventas.filter(v => v.comp === 'Factura' && !v.anulada).length;
+      const montoBoletas = ventas.filter(v => v.comp === 'Boleta' && !v.anulada).reduce((a, v) => a + v.total, 0);
+      const montoFacturas = ventas.filter(v => v.comp === 'Factura' && !v.anulada).reduce((a, v) => a + v.total, 0);
 
       return (<div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12 }}>
@@ -1166,10 +1192,11 @@
           {ventasConComprobante.length === 0 && (<div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 30, textAlign: 'center' }}><div style={{ fontSize: 28, marginBottom: 8 }}>📄</div><div style={{ fontFamily: 'Inter', fontSize: 14, color: C.textDim }}>No se encontraron comprobantes</div></div>)}
           {ventasConComprobante.map((v, i) => {
             const esFactura = v.comp === 'Factura'; const serie = esFactura ? v.serieFactura : v.serieBoleta;
-            return (<div key={i} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 18px' }}>
+            return (<div key={i} style={{ background: C.panel, border: `1px solid ${v.anulada ? C.red + '55' : C.border}`, borderRadius: 12, padding: '14px 18px', opacity: v.anulada ? 0.6 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 100 }}>
                   <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, background: esFactura ? C.greenSoft : C.tealSoft, color: esFactura ? C.green : C.teal }}>{v.comp}</span>
+                  {v.anulada && <span style={{ display: 'inline-block', marginLeft: 6, padding: '3px 8px', borderRadius: 5, fontSize: 10, fontWeight: 800, background: C.red + '22', color: C.red, letterSpacing: 0.5 }}>ANULADA</span>}
                   <div style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: C.text, marginTop: 4, fontWeight: 600 }}>{serie}</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 140 }}>
@@ -1180,7 +1207,10 @@
                 <div style={{ textAlign: 'right', minWidth: 80 }}><div style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: C.textDim }}>{v.fecha}</div><div style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: C.muted }}>{v.hora}</div></div>
                 <div style={{ textAlign: 'right', minWidth: 80 }}><div style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: C.amber }}>{money(v.total)}</div></div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => setShowPreview(v)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 10px', color: C.textDim, cursor: 'pointer', fontFamily: 'Inter', fontSize: 11.5 }}><I.Eye size={13} /> Ver</button>
+                  <button onClick={() => setShowPreview(v)} title="Ver comprobante" type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 10px', color: C.textDim, cursor: 'pointer', fontFamily: 'Inter', fontSize: 11.5 }}><I.Eye size={13} /> Ver</button>
+                  <button onClick={() => abrirEditar(v)} title="Modificar comprobante" type="button" style={{ display: 'flex', alignItems: 'center', background: C.bg, border: `1px solid ${C.teal}55`, borderRadius: 7, padding: '6px 8px', color: C.teal, cursor: 'pointer' }}><I.Pencil size={13} /></button>
+                  <button onClick={() => anularComprobante(v)} title={v.anulada ? 'Restaurar comprobante' : 'Anular comprobante'} type="button" style={{ display: 'flex', alignItems: 'center', background: C.bg, border: `1px solid ${v.anulada ? C.green + '55' : C.red + '55'}`, borderRadius: 7, padding: '6px 8px', color: v.anulada ? C.green : C.red, cursor: 'pointer' }}><I.Ban size={13} /></button>
+                  <button onClick={() => eliminarComprobante(v)} title="Eliminar comprobante" type="button" style={{ display: 'flex', alignItems: 'center', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 8px', color: C.muted, cursor: 'pointer' }}><I.Trash2 size={13} /></button>
                 </div>
               </div>
               {esFactura && <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}`, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -1227,6 +1257,42 @@
               <button onClick={crearComprobante} type="button" style={{ flex: 1.5, background: guardado ? C.green : C.amber, color: C.bg, border: 'none', borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{guardado ? '✅ Comprobante creado' : '📄 Crear y agregar al historial'}</button>
             </div>
           </div>
+        </div>)}
+
+        {/* MODAL EDITAR COMPROBANTE */}
+        {showEditar && editDatos && (<div onClick={() => { setShowEditar(null); setEditDatos(null); }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, width: '100%', maxWidth: 520, maxHeight: '92vh', overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><I.Pencil size={18} color={C.teal} /><span style={{ fontFamily: 'Inter', fontSize: 16, fontWeight: 700, color: C.text }}>Modificar comprobante</span></div>
+              <button onClick={() => { setShowEditar(null); setEditDatos(null); }} type="button" style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer' }}><I.X size={18} /></button>
+            </div>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Tipo de comprobante</div>
+              <div style={{ display: 'flex', gap: 8 }}>{[{ id: 'Boleta', label: 'Boleta', color: C.teal }, { id: 'Factura', label: 'Factura', color: C.green }].map(t => (<button key={t.id} onClick={() => setEditDatos(d => ({ ...d, comp: t.id }))} type="button" style={{ flex: 1, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', border: `1.5px solid ${editDatos.comp === t.id ? t.color : C.border}`, background: editDatos.comp === t.id ? `${t.color}22` : C.bg, color: editDatos.comp === t.id ? t.color : C.textDim, fontFamily: 'Inter', fontSize: 12.5, fontWeight: 600 }}>{t.label}</button>))}</div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Serie ({editDatos.comp === 'Factura' ? 'F001-...' : 'B001-...'})</div><input value={editDatos.comp === 'Factura' ? editDatos.serieFactura : editDatos.serieBoleta} onChange={e => setEditDatos(d => ({ ...d, [editDatos.comp === 'Factura' ? 'serieFactura' : 'serieBoleta']: e.target.value }))} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
+              <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Total (S/)</div><input type="number" step="0.01" min="0" value={editDatos.total} onChange={e => setEditDatos(d => ({ ...d, total: e.target.value }))} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
+            </div>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Método de pago</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>{METODOS.map(m => { const sel2 = m.label === editDatos.metodo; return (<button key={m.id} onClick={() => setEditDatos(d => ({ ...d, metodo: m.label }))} type="button" style={{ padding: '8px 4px', borderRadius: 8, cursor: 'pointer', textAlign: 'center', border: `1.5px solid ${sel2 ? C.amber : C.border}`, background: sel2 ? C.amberSoft : C.bg, color: sel2 ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 11, fontWeight: 500 }}>{m.label}</button>); })}</div></div>
+            {editDatos.comp === 'Factura' ? (<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>RUC</div><input value={editDatos.ruc} onChange={e => setEditDatos(d => ({ ...d, ruc: e.target.value }))} maxLength={11} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
+              <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Razón Social</div><input value={editDatos.razonSocial} onChange={e => setEditDatos(d => ({ ...d, razonSocial: e.target.value }))} style={{ ...getInputStyle() }} /></div>
+            </div>) : (<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>DNI</div><input value={editDatos.dniCliente} onChange={e => setEditDatos(d => ({ ...d, dniCliente: e.target.value }))} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
+              <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Nombre</div><input value={editDatos.nombreCliente} onChange={e => setEditDatos(d => ({ ...d, nombreCliente: e.target.value }))} style={{ ...getInputStyle() }} /></div>
+            </div>)}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Placa (opcional)</div><input value={editDatos.placa} onChange={e => setEditDatos(d => ({ ...d, placa: e.target.value.toUpperCase() }))} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
+              <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Fecha</div><input value={editDatos.fecha} onChange={e => setEditDatos(d => ({ ...d, fecha: e.target.value }))} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
+              <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Hora</div><input value={editDatos.hora} onChange={e => setEditDatos(d => ({ ...d, hora: e.target.value }))} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
+            </div>
+            <div style={{ background: C.red + '11', border: `1px solid ${C.red}33`, borderRadius: 8, padding: 10, fontFamily: 'Inter', fontSize: 11.5, color: C.red }}>
+              ⚠️ Al cambiar el tipo de comprobante se ajustan serie y datos del cliente automáticamenteal guardar.
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <button onClick={() => { setShowEditar(null); setEditDatos(null); }} type="button" style={{ flex: 1, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, color: C.textDim, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={guardarEdicion} type="button" style={{ flex: 1.5, background: C.amber, color: C.bg, border: 'none', borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>💾 Guardar cambios</button>
+            </div>          </div>
         </div>)}
 
         {/* MODAL VISTA PREVIA */}
@@ -2158,6 +2224,8 @@
       Plus: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
       ChevronDown: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
       Trash2: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+      Pencil: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>,
+      Ban: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>,
     };
 
     /* ===================== WORKER: NUEVA VENTA ===================== */
@@ -2639,13 +2707,13 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
 
       // Ventas virtuales (no efectivo) — sync with ventasWorker
       const [ventasVirtuales, setVentasVirtuales] = useState(() =>
-        ventasWorker.filter(v => v.metodo !== 'Efectivo').map(v => ({ ...v }))
+        ventasWorker.filter(v => v.metodo !== 'Efectivo' && !v.anulada).map(v => ({ ...v }))
       );
       const [metodoEditando, setMetodoEditando] = useState(null);
       useEffect(() => {
         setVentasVirtuales(prev => {
           const prevIds = new Set(prev.map(v => v.id));
-          const nuevas = ventasWorker.filter(v => v.metodo !== 'Efectivo' && !prevIds.has(v.id));
+          const nuevas = ventasWorker.filter(v => v.metodo !== 'Efectivo' && !v.anulada && !prevIds.has(v.id));
           if (nuevas.length === 0) return prev;
           return [...prev, ...nuevas.map(v => ({ ...v }))];
         });
@@ -2703,7 +2771,7 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
       }
 
       const totalGastos = gastos.reduce((sum, g) => sum + calcularMontoGasto(g), 0);
-      const totalVentasVirtuales = ventasVirtuales.reduce((a, v) => a + v.total, 0);
+      const totalVentasVirtuales = ventasVirtuales.filter(v => !v.anulada).reduce((a, v) => a + v.total, 0);
       const efectivoFijo = totalMangueras - totalVentasVirtuales - totalGastos;
 
       const now = new Date();
@@ -3343,12 +3411,20 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
         return ids.map(id => todas.find(m => m.id === id)).filter(Boolean);
       })();
       const ventasVisibles = [...ventasWorker];
-      const totalVentas = ventasWorker.length;
-      const montoTotal = ventasWorker.reduce((a, v) => a + v.total, 0);
       function cambiarMetodo(id, nuevoMetodo) {
         setVentasWorker(prev => prev.map(v => v.id === id ? { ...v, metodo: nuevoMetodo } : v));
         setMetodoEditando(null);
       }
+      function anularVenta(id) {
+        setVentasWorker(prev => prev.map(v => v.id === id ? { ...v, anulada: !v.anulada } : v));
+      }
+      function eliminarVenta(id) {
+        if (!window.confirm('¿Eliminar esta venta definitivamente? Esta acción no se puede deshacer.')) return;
+        setVentasWorker(prev => prev.filter(v => v.id !== id));
+      }
+      const ventasActivas = ventasWorker.filter(v => !v.anulada);
+      const totalVentas = ventasActivas.length;
+      const montoTotal = ventasActivas.reduce((a, v) => a + v.total, 0);
       const now = new Date();
       const fechaLarga = now.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' });
       const fechaFormateada = fechaLarga.charAt(0).toUpperCase() + fechaLarga.slice(1);
@@ -3445,7 +3521,8 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {ventasVisibles.map((v) => (
-                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: C.bg, borderRadius: 8, border: `1px solid ${C.border}`, position: 'relative' }}>
+                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: C.bg, borderRadius: 8, border: `1px solid ${v.anulada ? C.red + '55' : C.border}`, position: 'relative', opacity: v.anulada ? 0.55 : 1 }}>
+                      {v.anulada && <span style={{ position: 'absolute', top: 2, right: 6, fontSize: 8, fontWeight: 800, color: C.red, letterSpacing: 1 }}>ANULADA</span>}
                       <div style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: C.muted, minWidth: 38 }}>{v.hora}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontFamily: 'Inter', fontSize: 12.5, color: C.text, fontWeight: 500 }}>{v.producto}</div>
@@ -3465,7 +3542,11 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
                           </div>
                         )}
                       </div>
-                      <div style={{ fontFamily: 'JetBrains Mono', fontSize: 13, fontWeight: 700, color: C.amber }}>{money(v.total)}</div>
+                      <div style={{ fontFamily: 'JetBrains Mono', fontSize: 13, fontWeight: 700, color: v.anulada ? C.muted : C.amber, textDecoration: v.anulada ? 'line-through' : 'none' }}>{money(v.total)}</div>
+                      <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                        <button onClick={() => anularVenta(v.id)} title={v.anulada ? 'Restaurar venta' : 'Anular venta'} type="button" style={{ background: 'none', border: 'none', color: v.anulada ? C.green : C.red, cursor: 'pointer', padding: 4 }}><WI.Ban size={14} /></button>
+                        <button onClick={() => eliminarVenta(v.id)} title="Eliminar venta" type="button" style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 4 }}><WI.Trash2 size={14} /></button>
+                      </div>
                     </div>
                   ))}
                 </div>
