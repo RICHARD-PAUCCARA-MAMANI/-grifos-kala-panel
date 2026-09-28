@@ -2050,7 +2050,7 @@
               setClienteDireccion(res.direccion || '');
             }
           });
-        } else if (tipoComprobante === 'Boleta' && doc.length === 8 && /^\d{8}$/.test(doc)) {
+        } else if ((tipoComprobante === 'Boleta' || tipoComprobante === 'Cotización') && doc.length === 8 && /^\d{8}$/.test(doc)) {
           setCargandoCliente(true);
           consultarDNI(doc).then(res => {
             setCargandoCliente(false);
@@ -2108,6 +2108,7 @@
         const fecha = now.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
         const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
         const esFactura = ventaRegistrada.comp === 'Factura';
+        const esCotizacion = ventaRegistrada.comp === 'Cotización';
         const sub = (ventaRegistrada.total / 1.18);
         const igv = (ventaRegistrada.total - sub);
 
@@ -2175,7 +2176,7 @@
 
 <!-- ═══ TIPO DE COMPROBANTE ═══ -->
 <div class='c'>
-  <div style='font-family:Playfair Display,Georgia,serif;font-size:${13*s}px;font-weight:900;letter-spacing:${1.5*s}px;color:#1a1a1a'>${esFactura ? 'FACTURA' : 'BOLETA'} ELECTRÓNICA</div>
+  <div style='font-family:Playfair Display,Georgia,serif;font-size:${13*s}px;font-weight:900;letter-spacing:${1.5*s}px;color:#1a1a1a'>${esFactura ? 'FACTURA ELECTRÓNICA' : esCotizacion ? 'COTIZACIÓN' : 'BOLETA ELECTRÓNICA'}</div>
   <div style='font-size:${14*s}px;font-weight:900;margin-top:${1*s}mm;color:#000'>${ventaRegistrada.serie}</div>
 </div>
 
@@ -2186,11 +2187,12 @@
 <div style='margin-bottom:${2*s}mm'>
   <div style='font-size:${10*s}px;font-weight:700;line-height:2;color:#1a1a1a'>
     <div class='row-label'><span class='label'>CLIENTE</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clienteNombre || 'CLIENTE VARIOS'}</span></div>
-    <div class='row-label'><span class='label'>${esFactura ? 'RUC' : 'DNI'}</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clienteDoc || '---'}</span></div>
+    ${(ventaRegistrada.clienteDoc || !esCotizacion) ? `<div class='row-label'><span class='label'>${esFactura ? 'RUC' : 'DNI'}</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clienteDoc || '---'}</span></div>` : ''}
     ${ventaRegistrada.clienteDireccion ? `<div class='row-label'><span class='label'>DIRECCIÓN</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clienteDireccion}</span></div>` : ''}
     ${ventaRegistrada.clientePlaca ? `<div class='row-label'><span class='label'>PLACA</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clientePlaca}</span></div>` : ''}
   </div>
 </div>
+${esCotizacion ? `<div style='text-align:center;font-size:${8*s}px;font-weight:700;color:#333;margin-bottom:${2*s}mm'>*** COTIZACIÓN VÁLIDA POR 3 DÍAS ***</div>` : ''}
 
 <div class='sep3'></div>
 
@@ -2248,7 +2250,7 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
       function registrarVenta() {
         if (carrito.length === 0) return;
         const now = new Date();
-        const serie = tipoComprobante === 'Factura' ? 'F001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0') : 'B001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0');
+        const serie = tipoComprobante === 'Factura' ? 'F001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0') : tipoComprobante === 'Cotización' ? 'C001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0') : 'B001-' + String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0');
         const ventaRegistrada = {
           id: Date.now(),
           fecha: formatFechaCorta(now),
@@ -2344,7 +2346,7 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
         <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
           <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>4. Comprobante</div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            {[{ label: 'Boleta' }, { label: 'Factura' }, { label: 'Nota de venta' }].map(c => (
+            {[{ label: 'Boleta' }, { label: 'Factura' }, { label: 'Nota de venta' }, { label: 'Cotización' }].map(c => (
               <button key={c.label} onClick={() => setTipoComprobante(c.label)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1.5px solid ${tipoComprobante === c.label ? C.amber : C.border}`, background: tipoComprobante === c.label ? C.amberSoft : 'transparent', color: tipoComprobante === c.label ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{c.label}</button>
             ))}
           </div>
