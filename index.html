@@ -2264,6 +2264,8 @@
       const [productoId, setProductoId] = useState(PRODUCTOS[0].id);
       const [cantidad, setCantidad] = useState('');
       const [porSoles, setPorSoles] = useState(true);
+      const [mostrarMayoreo, setMostrarMayoreo] = useState(false);
+      const [precioMayoreo, setPrecioMayoreo] = useState('');
       const [metodoPago, setMetodoPago] = useState('Efectivo');
       const [tipoComprobante, setTipoComprobante] = useState('Boleta');
       const [carrito, setCarrito] = useState([]);
@@ -2304,24 +2306,33 @@
       ];
 
       const producto = PRODUCTOS.find(p => p.id === productoId);
+      // Precio por mayor: editable SOLO para combustibles (unidad gal), y solo como descuento
+      const esCombustible = !!producto && producto.unidad === 'gal';
+      const precioBase = producto ? producto.precio : 0;
+      const precioMayoreoNum = parseFloat(precioMayoreo) || 0;
+      const aplicarMayoreo = esCombustible && mostrarMayoreo && precioMayoreoNum > 0 && precioMayoreoNum < precioBase;
+      const precioUnit = aplicarMayoreo ? precioMayoreoNum : precioBase;
+      const ahorroUnit = precioBase - precioUnit;
       const numCantidad = parseFloat(cantidad) || 0;
       let subtotalItem = 0;
       if (producto && numCantidad > 0) {
-        subtotalItem = porSoles ? numCantidad : numCantidad * producto.precio;
+        subtotalItem = porSoles ? numCantidad : numCantidad * precioUnit;
       }
       const subtotalCarrito = carrito.reduce((a, it) => a + it.total, 0);
       const totalGeneral = subtotalCarrito;
 
       function agregarAlCarrito() {
         if (!producto || numCantidad <= 0) return;
-        const galonesLitros = porSoles ? (numCantidad / producto.precio) : numCantidad;
-        const total = porSoles ? numCantidad : numCantidad * producto.precio;
+        const galonesLitros = porSoles ? (numCantidad / precioUnit) : numCantidad;
+        const total = porSoles ? numCantidad : numCantidad * precioUnit;
         setCarrito(prev => [...prev, {
           id: Date.now(),
           producto: producto.nombre,
           productoId: producto.id,
           cant: galonesLitros.toFixed(2) + ' ' + producto.unidad,
-          precioUnitario: producto.precio,
+          precioUnitario: precioUnit,
+          precioBase,
+          mayoreo: aplicarMayoreo,
           total: Math.round(total * 100) / 100,
         }]);
         setCantidad('');
@@ -2519,7 +2530,7 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
           <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>1. Selecciona el producto</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 8 }}>
             {PRODUCTOS.filter(p => p.id !== 'diesel4').map(p => (
-              <button key={p.id} onClick={() => setProductoId(p.id)} type="button" style={{ padding: '12px 10px', borderRadius: 10, border: `2px solid ${productoId === p.id ? p.color : C.border}`, background: productoId === p.id ? p.soft : C.panel, cursor: 'pointer', textAlign: 'center' }}>
+              <button key={p.id} onClick={() => { setProductoId(p.id); setMostrarMayoreo(false); setPrecioMayoreo(''); }} type="button" style={{ padding: '12px 10px', borderRadius: 10, border: `2px solid ${productoId === p.id ? p.color : C.border}`, background: productoId === p.id ? p.soft : C.panel, cursor: 'pointer', textAlign: 'center' }}>
                 <div style={{ fontFamily: 'Oswald', fontSize: 13, fontWeight: 600, color: productoId === p.id ? p.color : C.textDim, textTransform: 'uppercase' }}>{p.nombre}</div>
                 <div style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: p.color, marginTop: 4 }}>S/ {p.precio.toFixed(2)}</div>
                 <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>/ {p.unidad}</div>
@@ -2536,6 +2547,19 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
               <button onClick={() => setPorSoles(true)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${porSoles ? C.amber : C.border}`, background: porSoles ? C.amberSoft : 'transparent', color: porSoles ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Por soles</button>
               <button onClick={() => setPorSoles(false)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${!porSoles ? producto.color : C.border}`, background: !porSoles ? producto.soft : 'transparent', color: !porSoles ? producto.color : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Por {producto.unidad}</button>
             </div>
+            {esCombustible && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                <button onClick={() => { const v = !mostrarMayoreo; setMostrarMayoreo(v); setPrecioMayoreo(''); }} type="button" style={{ padding: '8px 14px', borderRadius: 8, border: `1.5px solid ${mostrarMayoreo ? C.green : C.border}`, background: mostrarMayoreo ? C.greenSoft : 'transparent', color: mostrarMayoreo ? C.green : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>🏷️ Precio por mayor</button>
+                {mostrarMayoreo && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input type="number" step="0.01" min="0" placeholder={precioBase.toFixed(2)} value={precioMayoreo} onChange={e => setPrecioMayoreo(e.target.value)} style={{ width: 120, background: C.panel, border: `1px solid ${aplicarMayoreo ? C.green : (precioMayoreoNum >= precioBase && precioMayoreoNum > 0 ? C.red : C.border)}`, borderRadius: 8, padding: '8px 10px', color: aplicarMayoreo ? C.green : C.text, fontFamily: 'JetBrains Mono', fontSize: 13, boxSizing: 'border-box' }} />
+                    <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>Regular <span style={{ textDecoration: 'line-through' }}>S/ {precioBase.toFixed(2)}</span> / {producto.unidad}</span>
+                    {aplicarMayoreo && <span style={{ fontFamily: 'Inter', fontSize: 11, fontWeight: 700, color: C.green }}>✓ −S/ {ahorroUnit.toFixed(2)} ({((ahorroUnit / precioBase) * 100).toFixed(1)}% dto.)</span>}
+                    {precioMayoreoNum >= precioBase && precioMayoreoNum > 0 && <span style={{ fontFamily: 'Inter', fontSize: 11, fontWeight: 600, color: C.red }}>⚠️ Debe ser menor a S/ {precioBase.toFixed(2)}</span>}
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 4 }}>{porSoles ? 'Monto en soles' : 'Cantidad en ' + producto.unidad}</div>
@@ -2556,7 +2580,7 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
                 <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: C.panel, borderRadius: 8, border: `1px solid ${C.border}` }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.text, fontWeight: 500 }}>{it.producto}</div>
-                    <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>{it.cant} × S/ {it.precioUnitario.toFixed(2)}</div>
+                    <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>{it.cant} × S/ {it.precioUnitario.toFixed(2)}{it.mayoreo && <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: C.greenSoft, color: C.green, fontSize: 9.5, fontWeight: 700 }}>MAYOREO −S/ {(it.precioBase - it.precioUnitario).toFixed(2)}</span>}</div>
                   </div>
                   <div style={{ fontFamily: 'JetBrains Mono', fontSize: 13, fontWeight: 700, color: C.amber }}>S/ {it.total.toFixed(2)}</div>
                   <button onClick={() => eliminarDelCarrito(it.id)} type="button" style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 4 }}><WI.Trash2 size={14} /></button>
