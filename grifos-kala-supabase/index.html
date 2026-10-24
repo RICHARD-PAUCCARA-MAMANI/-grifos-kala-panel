@@ -768,22 +768,205 @@
     function money(n) { return 'S/ ' + n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
     function formatFechaCorta(d) { return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' }); }
 
-    // Historial de varillado (compartido entre trabajador y admin vía localStorage)
+    /* ===================== SINCRONIZACIÓN SUPABASE (varillado + cisternas) =====================
+       Los datos se guardan en Supabase para compartirse entre dispositivos.
+       localStorage queda como caché/respaldo: si la nube no responde, todo sigue funcionando
+       y los datos se suben en el próximo intento. */
     const HIST_VARILLADO_KEY = 'grifos_kala_historial_varillado';
+    const VEH_LS_KEY = 'grifos_kala_vehiculos';
+    let nubePendienteVar = false;   // true mientras hay escrituras de varillado en vuelo (bloquea refresh)
+    let nubePendienteVeh = false;   // true mientras hay escrituras de vehículos en vuelo (bloquea refresh)
+    let vehFlushGen = 0;            // generación de subida: evita liberar el bloqueo antes de tiempo
+    let subidaVehTimer = null;
+    let vehBorradosPendientes = [];
+
     function leerHistorialVarillado() {
       try { return JSON.parse(localStorage.getItem(HIST_VARILLADO_KEY)) || []; } catch { return []; }
+    }
+    function aFilaVarillado(reg) {
+      return { id: String(reg.id), estacion: reg.estacion || '', trabajador: reg.trabajador || '', fecha: reg.fecha || '', hora: reg.hora || '', mediciones: Array.isArray(reg.mediciones) ? reg.mediciones : [] };
+    }
+    function marcarSincVarillado(ids) {
+      try {
+        const conjunto = new Set((Array.isArray(ids) ? ids : [ids]).map(String));
+        localStorage.setItem(HIST_VARILLADO_KEY, JSON.stringify(leerHistorialVarillado().map(r => conjunto.has(String(r.id)) ? { ...r, sinc: 1 } : r)));
+      } catch {}
     }
     function guardarHistorialVarillado(reg) {
       const h = [reg, ...leerHistorialVarillado()].slice(0, 300);
       localStorage.setItem(HIST_VARILLADO_KEY, JSON.stringify(h));
       try { window.dispatchEvent(new Event('varilladoActualizado')); } catch {}
+      if (supabase) {
+        nubePendienteVar = true;
+        supabase.from('varillado_registros').upsert(aFilaVarillado(reg))
+          .then(res => { if (!(res && res.error)) marcarSincVarillado(reg.id); nubePendienteVar = false; })
+          .catch(() => { nubePendienteVar = false; });
+      }
       return h;
     }
     function eliminarHistorialVarillado(id) {
       const h = leerHistorialVarillado().filter(r => r.id !== id);
       localStorage.setItem(HIST_VARILLADO_KEY, JSON.stringify(h));
       try { window.dispatchEvent(new Event('varilladoActualizado')); } catch {}
+      if (supabase) {
+        nubePendienteVar = true;
+        supabase.from('varillado_registros').delete().eq('id', String(id))
+          .then(() => { nubePendienteVar = false; })
+          .catch(() => { nubePendienteVar = false; });
+      }
       return h;
+    }
+    // Descarga el historial desde Supabase, lo mezcla con lo local y lo guarda en la caché
+    function refrescarHistorialVarillado() {
+      if (!supabase || nubePendienteVar) return Promise.resolve();
+      return supabase.from('varillado_registros').select('*').order('created_at', { ascending: false }).limit(300)
+        .then(({ data, error }) => {
+          if (error || !Array.isArray(data)) return;
+          const locales = leerHistorialVarillado();
+          const idsNube = new Set(data.map(r => String(r.id)));
+          const soloLocal = locales.filter(r => !r.sinc && !idsNube.has(String(r.id))); // aún no subidos
+          const nube = data.map(r => ({ id: r.id, estacion: r.estacion, trabajador: r.trabajador, fecha: r.fecha, hora: r.hora, mediciones: r.mediciones || [], sinc: 1 }));
+          const mezcla = [...soloLocal, ...nube].slice(0, 300);
+          if (soloLocal.length) {
+            supabase.from('varillado_registros').upsert(soloLocal.map(aFilaVarillado))
+              .then(res => { if (!(res && res.error)) marcarSincVarillado(soloLocal.map(r => r.id)); })
+              .catch(() => {});
+          }
+          if (JSON.stringify(mezcla) !== JSON.stringify(locales)) {
+            localStorage.setItem(HIST_VARILLADO_KEY, JSON.stringify(mezcla));
+            try { window.dispatchEvent(new Event('varilladoActualizado')); } catch {}
+          }
+        })
+        .catch(() => {});
+    }
+
+    /* ---------- Vehículos / cisternas (ingresos y descargas de galones) ---------- */
+    function leerVehiculosLocal() {
+      try { return JSON.parse(localStorage.getItem(VEH_LS_KEY)) || []; } catch { return []; }
+    }
+    function aFilaVehiculo(v) {
+      const { id, estacion, tipo, nombre, placa, sinc, ...datos } = v;
+      return { id: String(id), estacion: estacion || '', tipo: tipo || 'cisterna', nombre: nombre || '', placa: placa || '', datos, actualizado_en: new Date().toISOString() };
+    }
+    function persistirVehiculos(nuevos) {
+      localStorage.setItem(VEH_LS_KEY, JSON.stringify(nuevos));
+      programarSubidaVehiculos();
+    }
+    function eliminarVehiculoNube(id) {
+      vehBorradosPendientes.push(String(id));
+      programarSubidaVehiculos();
+    }
+    function programarSubidaVehiculos() {
+      if (!supabase) return;
+      nubePendienteVeh = true;
+      vehFlushGen++;
+      clearTimeout(subidaVehTimer);
+      const gen = vehFlushGen;
+      subidaVehTimer = setTimeout(() => {
+        const filas = leerVehiculosLocal().map(aFilaVehiculo);
+        const borrar = vehBorradosPendientes.splice(0);
+        const ops = [];
+        if (filas.length) ops.push(supabase.from('vehiculos').upsert(filas, { onConflict: 'id' }));
+        if (borrar.length) ops.push(supabase.from('vehiculos').delete().in('id', borrar));
+        if (!ops.length) { if (vehFlushGen === gen) nubePendienteVeh = false; return; }
+        const idsSubidos = new Set(filas.map(f => f.id));
+        Promise.all(ops)
+          .then(res => {
+            const fallo = res.find(r => r && r.error);
+            if (!fallo) {
+              try {
+                localStorage.setItem(VEH_LS_KEY, JSON.stringify(leerVehiculosLocal().map(v => idsSubidos.has(String(v.id)) ? { ...v, sinc: 1 } : v)));
+              } catch {}
+            }
+          })
+          .catch(() => {})
+          .then(() => { if (vehFlushGen === gen) nubePendienteVeh = false; });
+      }, 600);
+    }
+    // Descarga vehículos desde Supabase y los mezcla con los locales (migración inicial incluida)
+    function refrescarVehiculosDesdeNube() {
+      if (!supabase || nubePendienteVeh) return Promise.resolve();
+      return supabase.from('vehiculos').select('*').limit(500)
+        .then(({ data, error }) => {
+          if (error || !Array.isArray(data)) return;
+          const locales = leerVehiculosLocal();
+          const idsNube = new Set(data.map(r => String(r.id)));
+          const soloLocal = locales.filter(v => !v.sinc && !idsNube.has(String(v.id)));
+          const nube = data.map(r => ({ id: r.id, estacion: r.estacion, tipo: r.tipo, nombre: r.nombre, placa: r.placa, ...(r.datos || {}), sinc: 1 }));
+          if (soloLocal.length) {
+            supabase.from('vehiculos').upsert(soloLocal.map(aFilaVehiculo), { onConflict: 'id' })
+              .then(res => {
+                if (!(res && res.error)) {
+                  try {
+                    const ids = new Set(soloLocal.map(v => String(v.id)));
+                    localStorage.setItem(VEH_LS_KEY, JSON.stringify(leerVehiculosLocal().map(v => ids.has(String(v.id)) ? { ...v, sinc: 1 } : v)));
+                  } catch {}
+                }
+              })
+              .catch(() => {});
+          }
+          const mezcla = [...soloLocal, ...nube];
+          if (JSON.stringify(mezcla) !== JSON.stringify(locales)) {
+            localStorage.setItem(VEH_LS_KEY, JSON.stringify(mezcla));
+            try { window.dispatchEvent(new Event('kalaVehiculosActualizados')); } catch {}
+          }
+        })
+        .catch(() => {});
+    }
+
+    /* ---------- Precios de productos (admin manda) — nube ---------- */
+    let nubePendientePrecios = false;
+    const MAPA_GRUPO_CODIGOS = { diesel: ['diesel', 'diesel4'], regular: ['regular'], urea: ['urea'] };
+    function leerPreciosLocal() {
+      try { const s = localStorage.getItem('grifos_kala_precios'); return s ? JSON.parse(s) : {}; } catch { return {}; }
+    }
+    function escribirPreciosLocal(map) {
+      try { localStorage.setItem('grifos_kala_precios', JSON.stringify(map)); } catch {}
+      try { window.dispatchEvent(new Event('preciosActualizados')); } catch {}
+    }
+    function marcarPreciosSinc() { try { localStorage.setItem('grifos_kala_precios_sinc', '1'); } catch {} }
+    function preciosYaSinc() { try { return localStorage.getItem('grifos_kala_precios_sinc') === '1'; } catch { return false; } }
+    // El admin edita un precio → sube a Supabase para que TODOS los dispositivos lo adopten
+    function subirPreciosAlGrupo(grupoId, precio) {
+      if (!supabase) return;
+      nubePendientePrecios = true;
+      const codigos = MAPA_GRUPO_CODIGOS[grupoId] || [grupoId];
+      Promise.all(codigos.map(c => supabase.from('productos').update({ precio: Number(precio) }).eq('codigo', c)))
+        .then(res => { if (!res.find(r => r && r.error)) marcarPreciosSinc(); nubePendientePrecios = false; })
+        .catch(() => { nubePendientePrecios = false; });
+    }
+    // Descarga los precios vigentes desde Supabase (nube canónica)
+    function refrescarPreciosDesdeNube() {
+      if (!supabase || nubePendientePrecios) return Promise.resolve();
+      return supabase.from('productos').select('codigo, precio').eq('activo', true)
+        .then(({ data, error }) => {
+          if (error || !Array.isArray(data) || !data.length) return;
+          const nube = {};
+          data.forEach(p => { if (p.codigo != null && p.precio != null) nube[p.codigo] = Number(p.precio); });
+          if (!preciosYaSinc()) {
+            // Primera sincronización: los precios que el admin ve AHORA en este dispositivo son los canónicos
+            const locales = leerPreciosLocal();
+            const ups = [];
+            PRODUCTOS_AGRUPADOS.forEach(g => {
+              const local = locales[g.id];
+              const precio = (local != null && local > 0) ? Number(local) : Number(g.precio);
+              (MAPA_GRUPO_CODIGOS[g.id] || [g.id]).forEach(c => {
+                if (nube[c] !== precio) ups.push(supabase.from('productos').update({ precio }).eq('codigo', c));
+              });
+            });
+            if (!ups.length) { marcarPreciosSinc(); return; }
+            Promise.all(ups).then(res => { if (!res.find(r => r && r.error)) marcarPreciosSinc(); }).catch(() => {});
+            return;
+          }
+          // Ya sincronizado: la nube manda → actualiza este dispositivo si difiere
+          const locales = leerPreciosLocal();
+          const merge = { ...locales };
+          Object.entries(nube).forEach(([codigo, precio]) => {
+            merge[codigo === 'diesel4' ? 'diesel' : codigo] = precio;
+          });
+          if (JSON.stringify(merge) !== JSON.stringify(locales)) escribirPreciosLocal(merge);
+        })
+        .catch(() => {});
     }
     function formatFechaLarga(d) { const s = d.toLocaleDateString('es-PE', { weekday: 'long', day: '2-digit', month: 'long' }); return s.charAt(0).toUpperCase() + s.slice(1); }
     function addDias(d, n) { const nd = new Date(d); nd.setDate(nd.getDate() + n); return nd; }
@@ -917,10 +1100,19 @@
       const [preciosEdit, setPreciosEdit] = useState(() => {
         try { const s = localStorage.getItem('grifos_kala_precios'); return s ? JSON.parse(s) : {}; } catch { return {}; }
       });
+      // Refresca los precios cuando llegan desde la nube u otro dispositivo
+      useEffect(() => {
+        const sync = () => setPreciosEdit(() => { try { const s = localStorage.getItem('grifos_kala_precios'); return s ? JSON.parse(s) : {}; } catch { return {}; } });
+        window.addEventListener('preciosActualizados', sync);
+        window.addEventListener('storage', sync);
+        return () => { window.removeEventListener('preciosActualizados', sync); window.removeEventListener('storage', sync); };
+      }, []);
       function actualizarPrecio(grupoId, nuevoPrecio) {
         const nuevos = { ...preciosEdit, [grupoId]: nuevoPrecio };
         setPreciosEdit(nuevos);
         localStorage.setItem('grifos_kala_precios', JSON.stringify(nuevos));
+        // El admin manda: sube el precio a Supabase para que todos los dispositivos lo adopten
+        subirPreciosAlGrupo(grupoId, nuevoPrecio);
         // Actualizar también en PRODUCTOS individuales
         const grupo = PRODUCTOS_AGRUPADOS.find(g => g.id === grupoId);
         if (grupo) {
@@ -2076,6 +2268,15 @@
       const [filtroTipo, setFiltroTipo] = useState('todos');
       const [formDescarga, setFormDescarga] = useState({}); // { [vehId]: { destino, galones } }
 
+      // Sincronización con Supabase: refresca al montar y al recibir cambios desde otro dispositivo
+      useEffect(() => {
+        const sync = () => setVehiculos(leerVehiculosLocal());
+        window.addEventListener('kalaVehiculosActualizados', sync);
+        window.addEventListener('storage', sync);
+        refrescarVehiculosDesdeNube();
+        return () => { window.removeEventListener('kalaVehiculosActualizados', sync); window.removeEventListener('storage', sync); };
+      }, []);
+
       function guardarVehiculo() {
         if (!form.nombre.trim() || !form.placa.trim()) return;
         const data = { ...form, nombre: form.nombre.trim().toUpperCase(), placa: form.placa.trim().toUpperCase(), estacion };
@@ -2086,7 +2287,7 @@
           nuevos = [...vehiculos, { id: Date.now(), ...data, galonesConsumidos: 0, galonesIngresados: 0, viaticos: 0, reposiciones: 0, descargas: [] }];
         }
         setVehiculos(nuevos);
-        localStorage.setItem('grifos_kala_vehiculos', JSON.stringify(nuevos));
+        persistirVehiculos(nuevos);
         setForm({ nombre: '', placa: '', tipo: 'cisterna', estacion });
         setEditId(null);
         setShowForm(false);
@@ -2095,7 +2296,8 @@
       function eliminarVehiculo(id) {
         const nuevos = vehiculos.filter(v => v.id !== id);
         setVehiculos(nuevos);
-        localStorage.setItem('grifos_kala_vehiculos', JSON.stringify(nuevos));
+        persistirVehiculos(nuevos);
+        eliminarVehiculoNube(id);
       }
 
       function editarVehiculo(v) {
@@ -2107,7 +2309,7 @@
       function actualizarCampo(id, campo, valor) {
         const nuevos = vehiculos.map(v => v.id === id ? { ...v, [campo]: parseFloat(valor) || 0 } : v);
         setVehiculos(nuevos);
-        localStorage.setItem('grifos_kala_vehiculos', JSON.stringify(nuevos));
+        persistirVehiculos(nuevos);
       }
 
       // Destino y descarga de combustible (por cisterna)
@@ -2128,13 +2330,13 @@
         };
         const nuevos = vehiculos.map(x => x.id === v.id ? { ...x, descargas: [...(x.descargas || []), reg] } : x);
         setVehiculos(nuevos);
-        localStorage.setItem('grifos_kala_vehiculos', JSON.stringify(nuevos));
+        persistirVehiculos(nuevos);
         setFormDescarga(prev => ({ ...prev, [v.id]: { destino: '', galones: '' } }));
       }
       function eliminarDescarga(vehId, descId) {
         const nuevos = vehiculos.map(x => x.id === vehId ? { ...x, descargas: (x.descargas || []).filter(d => d.id !== descId) } : x);
         setVehiculos(nuevos);
-        localStorage.setItem('grifos_kala_vehiculos', JSON.stringify(nuevos));
+        persistirVehiculos(nuevos);
       }
       function totalDescargado(v) {
         return (v.descargas || []).reduce((s, d) => s + (d.galones || 0), 0);
@@ -2359,10 +2561,26 @@
       Ban: (p) => <svg xmlns="http://www.w3.org/2000/svg" width={p.size||24} height={p.size||24} viewBox="0 0 24 24" fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>,
     };
 
+    /* ===================== PAPELES DE IMPRESIÓN (comprobante) =====================
+       page: valor para @page { size: ... } · body: ancho del cuerpo · escala: factor de fuentes
+       (58mm=1) · px: ancho del iframe de vista previa en píxeles. */
+    const PAPELES_IMPRESION = [
+      { id: '58', label: '58mm', desc: 'POS térmica', titulo: '58mm POS térmica', page: '58mm auto', body: '52mm', escala: 1, px: 300 },
+      { id: '80', label: '80mm', desc: 'POS amplia', titulo: '80mm POS amplia', page: '80mm auto', body: '72mm', escala: 1.25, px: 400 },
+      { id: 'a4', label: 'A4 / Carta', desc: 'Impresora normal', titulo: 'A4 / Carta', page: 'A4 auto', body: '180mm', escala: 2.2, px: 840, a4: true },
+      { id: '72x297', label: '72×297mm', desc: 'Custom', titulo: '72×297mm Custom', page: '72mm 297mm', body: '66mm', escala: 1.16, px: 380 },
+      { id: '72x420', label: '72×420mm', desc: 'larga', titulo: '72×420mm', page: '72mm 420mm', body: '66mm', escala: 1.16, px: 380 },
+      { id: '72x3276', label: '72×3276mm', desc: 'rollo', titulo: '72×3276mm rollo', page: '72mm 3276mm', body: '66mm', escala: 1.16, px: 380 },
+      { id: '48x297', label: '48×297mm', desc: 'Custom', titulo: '48×297mm', page: '48mm 297mm', body: '42mm', escala: 0.89, px: 270 },
+      { id: '48x420', label: '48×420mm', desc: 'larga', titulo: '48×420mm', page: '48mm 420mm', body: '42mm', escala: 0.89, px: 270 },
+      { id: '48x3276', label: '48×3276mm', desc: 'rollo', titulo: '48×3276mm rollo', page: '48mm 3276mm', body: '42mm', escala: 0.89, px: 270 },
+    ];
+
     /* ===================== WORKER: NUEVA VENTA ===================== */
     function WorkerNuevaVenta({ usuario, estacion, ventasWorker, setVentasWorker }) {
       const isMobile = useIsMobile();
       const [printerSize, setPrinterSize] = useState(() => localStorage.getItem('grifos_kala_printer') || '58');
+      const papelSel = PAPELES_IMPRESION.find(pp => pp.id === printerSize) || PAPELES_IMPRESION[0];
       const [previewHTML, setPreviewHTML] = useState('');
       const previewRef = useRef(null);
 
@@ -2511,11 +2729,11 @@
       }
 
       function imprimirComprobante(ventaRegistrada) {
-        // printerSize: '58' | '80' | 'a4'
-        const size = printerSize;
-        const isA4 = size === 'a4';
-        const bodyWidth = size === '58' ? '52mm' : size === '80' ? '72mm' : '180mm';
-        const pageWidth = size === '58' ? '58mm' : size === '80' ? '80mm' : 'A4';
+        // printerSize: ver PAPELES_IMPRESION ('58' | '80' | 'a4' | '72x297' | '72x420' | '72x3276' | '48x297' | '48x420' | '48x3276')
+        const papel = papelSel;
+        const isA4 = !!papel.a4;
+        const bodyWidth = papel.body;
+        const pageWidth = papel.page;
         const now = new Date();
         const fecha = now.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
         const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
@@ -2524,8 +2742,8 @@
         const sub = (ventaRegistrada.total / 1.18);
         const igv = (ventaRegistrada.total - sub);
 
-        // Scale factor: 58mm=1, 80mm=1.25, A4=2.2
-        const s = size === '58' ? 1 : size === '80' ? 1.25 : 2.2;
+        // Scale factor por ancho de papel (PAPELES_IMPRESION.escala): 48=0.89, 58=1, 72=1.16, 80=1.25, A4=2.2
+        const s = papel.escala;
 
         let itemsHtml = '';
         ventaRegistrada.items.forEach(it => {
@@ -2544,7 +2762,7 @@
         const htmlComp = `<!DOCTYPE html><html><head><meta charset='utf-8'><title>Comprobante</title>
 <link href='https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;600;700;900&display=swap' rel='stylesheet'>
 <style>
-  @page { size: ${pageWidth} auto; margin: 0; }
+  @page { size: ${pageWidth}; margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: ${fontStack}; padding: ${padBody}; width: ${bodyWidth}; font-size: ${9*s}px; font-weight: 400; color: #000; background: #fff; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: ${0.2*s}px; }
   .c { text-align: center; }
@@ -2830,7 +3048,7 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
           {/* Selector de tamaño de papel */}
           <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, fontWeight: 600 }}>🖨️ Impresora:</span>
-            {[{ id: '58', label: '58mm', desc: 'POS térmica' }, { id: '80', label: '80mm', desc: 'POS amplia' }, { id: 'a4', label: 'A4 / Carta', desc: 'Impresora normal' }].map(opt => (
+            {PAPELES_IMPRESION.map(opt => (
               <button key={opt.id} onClick={() => { setPrinterSize(opt.id); localStorage.setItem('grifos_kala_printer', opt.id); }} type="button" style={{ padding: '6px 12px', borderRadius: 6, border: `1.5px solid ${printerSize === opt.id ? C.amber : C.border}`, background: printerSize === opt.id ? C.amberSoft : 'transparent', color: printerSize === opt.id ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 {opt.label} <span style={{ fontSize: 9, opacity: 0.7, marginLeft: 2 }}>({opt.desc})</span>
               </button>
@@ -2845,7 +3063,7 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <I.Eye size={18} color={C.amber} />
-                  <span style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 700, color: '#F3EFE6' }}>Vista previa — {printerSize === '58' ? '58mm POS térmica' : printerSize === '80' ? '80mm POS amplia' : 'A4 / Carta'}</span>
+                  <span style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 700, color: '#F3EFE6' }}>Vista previa — {papelSel.titulo}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => { const f = previewRef.current; if (f) { f.focus(); f.contentWindow.focus(); setTimeout(() => f.contentWindow.print(), 400); } }} type="button" style={{ padding: '10px 18px', borderRadius: 8, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>🖨️ Imprimir</button>
@@ -2853,9 +3071,9 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
                 </div>
               </div>
               <div style={{ background: '#2A333B', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'center', overflow: 'auto' }}>
-                <iframe ref={previewRef} srcDoc={previewHTML} title="Vista previa comprobante" style={{ width: printerSize === '58' ? 300 : printerSize === '80' ? 400 : 840, height: '72vh', border: 'none', background: '#fff', borderRadius: 4, boxShadow: '0 8px 28px rgba(0,0,0,0.55)', flexShrink: 0 }} />
+                <iframe ref={previewRef} srcDoc={previewHTML} title="Vista previa comprobante" style={{ width: papelSel.px, height: '72vh', border: 'none', background: '#fff', borderRadius: 4, boxShadow: '0 8px 28px rgba(0,0,0,0.55)', flexShrink: 0 }} />
               </div>
-              <div style={{ fontFamily: 'Inter', fontSize: 11, color: '#7C868D', textAlign: 'center' }}>Así se verá al imprimir en {printerSize === 'a4' ? 'A4' : printerSize + 'mm'}. Cambia el tamaño en el selector de impresora para probar otro formato.</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: '#7C868D', textAlign: 'center' }}>Así se verá al imprimir en {papelSel.id === 'a4' ? 'A4' : papelSel.label}. Cambia el tamaño en el selector de impresora para probar otro formato.</div>
             </div>
           </div>
         )}
@@ -3879,6 +4097,30 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
       useEffect(() => {
         document.body.style.background = palette.bg;
       }, [palette]);
+      // Sincronización global con Supabase: varillado + vehículos/cisternas entre dispositivos
+      useEffect(() => {
+        if (!supabase) return;
+        refrescarHistorialVarillado();
+        refrescarVehiculosDesdeNube();
+        refrescarPreciosDesdeNube();
+        const iv = setInterval(() => { refrescarHistorialVarillado(); refrescarVehiculosDesdeNube(); refrescarPreciosDesdeNube(); }, 20000);
+        const alVolver = () => { refrescarHistorialVarillado(); refrescarVehiculosDesdeNube(); refrescarPreciosDesdeNube(); };
+        window.addEventListener('focus', alVolver);
+        let canal = null;
+        try {
+          // Cambios en tiempo real (si la publicación realtime está habilitada en Supabase)
+          canal = supabase.channel('kala-sync');
+          canal.on('postgres_changes', { event: '*', schema: 'public', table: 'varillado_registros' }, () => refrescarHistorialVarillado());
+          canal.on('postgres_changes', { event: '*', schema: 'public', table: 'vehiculos' }, () => refrescarVehiculosDesdeNube());
+          canal.on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => refrescarPreciosDesdeNube());
+          canal.subscribe();
+        } catch {}
+        return () => {
+          clearInterval(iv);
+          window.removeEventListener('focus', alVolver);
+          try { if (canal) supabase.removeChannel(canal); } catch {}
+        };
+      }, []);
       function toggleTheme() { setThemeDark(!themeDark); }
       const [ventas, setVentas] = useState([
         { fecha: formatFechaCorta(new Date()), hora: '08:15', producto: 'Diésel B5', cant: '45.20 gal', precioUnitario: 23.10, total: 1044.12, metodo: 'Efectivo', comp: 'Boleta', serieBoleta: 'B001-00123', serieFactura: null, ruc: null, razonSocial: null, dniCliente: '48562190', nombreCliente: 'Milagros Condori', placa: null, items: [{ producto: 'Diésel B5', cant: '45.20 gal', precioUnitario: 23.10, total: 1044.12 }], itemCount: 1, esBancarizacion: false, trabajador: 'Milagros Condori' },
