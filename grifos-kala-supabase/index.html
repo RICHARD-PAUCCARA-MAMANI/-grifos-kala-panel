@@ -2395,6 +2395,31 @@
       }, []);
 
       const [productoId, setProductoId] = useState(PRODUCTOS[0].id);
+      // Precios modificables SOLO por el trabajador (locale de este usuario, no afecta a otros ni al admin)
+      const [preciosLocal, setPreciosLocal] = useState(() => {
+        try { const s = localStorage.getItem('grifos_kala_precio_trab_' + usuario); return s ? JSON.parse(s) : {}; } catch { return {}; }
+      });
+      const [editPrecioCard, setEditPrecioCard] = useState(null);
+      const [valorPrecioCard, setValorPrecioCard] = useState('');
+      function precioDe(p) {
+        const v = preciosLocal[p.id];
+        return (v != null && v > 0) ? v : p.precio;
+      }
+      function guardarPrecioCard(id) {
+        const n = Math.round((parseFloat(valorPrecioCard) || 0) * 100) / 100;
+        if (!(n > 0)) return;
+        const nuevos = { ...preciosLocal, [id]: n };
+        setPreciosLocal(nuevos);
+        try { localStorage.setItem('grifos_kala_precio_trab_' + usuario, JSON.stringify(nuevos)); } catch {}
+        setEditPrecioCard(null);
+      }
+      function restaurarPrecioGlobal(id) {
+        const nuevos = { ...preciosLocal };
+        delete nuevos[id];
+        setPreciosLocal(nuevos);
+        try { localStorage.setItem('grifos_kala_precio_trab_' + usuario, JSON.stringify(nuevos)); } catch {}
+        setEditPrecioCard(null);
+      }
       const [cantidad, setCantidad] = useState('');
       const [porSoles, setPorSoles] = useState(true);
       const [editPrecioId, setEditPrecioId] = useState(null);
@@ -2439,25 +2464,26 @@
       ];
 
       const producto = PRODUCTOS.find(p => p.id === productoId);
+      const precioProd = producto ? precioDe(producto) : 0;
       const numCantidad = parseFloat(cantidad) || 0;
       let subtotalItem = 0;
       if (producto && numCantidad > 0) {
-        subtotalItem = porSoles ? numCantidad : numCantidad * producto.precio;
+        subtotalItem = porSoles ? numCantidad : numCantidad * precioProd;
       }
       const subtotalCarrito = carrito.reduce((a, it) => a + it.total, 0);
       const totalGeneral = subtotalCarrito;
 
       function agregarAlCarrito() {
         if (!producto || numCantidad <= 0) return;
-        const galonesLitros = porSoles ? (numCantidad / producto.precio) : numCantidad;
-        const total = porSoles ? numCantidad : numCantidad * producto.precio;
+        const galonesLitros = porSoles ? (numCantidad / precioProd) : numCantidad;
+        const total = porSoles ? numCantidad : numCantidad * precioProd;
         setCarrito(prev => [...prev, {
           id: Date.now(),
           producto: producto.nombre,
           productoId: producto.id,
           cant: galonesLitros.toFixed(2) + ' ' + producto.unidad,
-          precioUnitario: producto.precio,
-          precioBase: producto.precio,
+          precioUnitario: precioProd,
+          precioBase: precioProd,
           combustible: producto.unidad === 'gal',
           mayoreo: false,
           total: Math.round(total * 100) / 100,
@@ -2670,13 +2696,31 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
         <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
           <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>1. Selecciona el producto</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 8 }}>
-            {PRODUCTOS.filter(p => p.id !== 'diesel4').map(p => (
-              <button key={p.id} onClick={() => setProductoId(p.id)} type="button" style={{ padding: '12px 10px', borderRadius: 10, border: `2px solid ${productoId === p.id ? p.color : C.border}`, background: productoId === p.id ? p.soft : C.panel, cursor: 'pointer', textAlign: 'center' }}>
+            {PRODUCTOS.filter(p => p.id !== 'diesel4').map(p => {
+              const editandoP = editPrecioCard === p.id;
+              const precioP = precioDe(p);
+              const esCustom = preciosLocal[p.id] != null && preciosLocal[p.id] !== p.precio;
+              return (
+              <div key={p.id} onClick={() => { if (!editandoP) setProductoId(p.id); }} role="button" style={{ padding: '12px 10px', borderRadius: 10, border: `2px solid ${productoId === p.id ? p.color : C.border}`, background: productoId === p.id ? p.soft : C.panel, cursor: 'pointer', textAlign: 'center', position: 'relative' }}>
                 <div style={{ fontFamily: 'Oswald', fontSize: 13, fontWeight: 600, color: productoId === p.id ? p.color : C.textDim, textTransform: 'uppercase' }}>{p.nombre}</div>
-                <div style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: p.color, marginTop: 4 }}>S/ {p.precio.toFixed(2)}</div>
+                {!editandoP ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 }}>
+                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: esCustom ? C.green : p.color }}>S/ {precioP.toFixed(2)}</span>
+                    <span onClick={e => { e.stopPropagation(); setEditPrecioCard(p.id); setValorPrecioCard(precioP.toFixed(2)); }} title="Modificar precio (solo tu usuario)" style={{ color: C.muted, cursor: 'pointer', display: 'flex', padding: 2 }} onMouseOver={e => e.currentTarget.style.color = C.amber} onMouseOut={e => e.currentTarget.style.color = C.muted}><WI.Pencil size={13} /></span>
+                  </div>
+                ) : (
+                  <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 4 }}>
+                    <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>S/</span>
+                    <input autoFocus type="number" step="0.01" min="0" value={valorPrecioCard} onChange={e => setValorPrecioCard(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') guardarPrecioCard(p.id); if (e.key === 'Escape') setEditPrecioCard(null); }} style={{ width: 76, background: C.bg, border: `1px solid ${C.green}`, borderRadius: 6, padding: '4px 6px', color: C.green, fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, textAlign: 'center', boxSizing: 'border-box' }} />
+                    <span onClick={() => guardarPrecioCard(p.id)} title="Guardar" style={{ background: C.green, color: C.bg, borderRadius: 5, cursor: 'pointer', padding: '2px 6px', fontFamily: 'Inter', fontSize: 12, fontWeight: 700, display: 'flex' }}><WI.Check size={13} /></span>
+                    <span onClick={() => setEditPrecioCard(null)} title="Cancelar" style={{ background: C.border, color: C.textDim, borderRadius: 5, cursor: 'pointer', padding: '2px 6px', fontFamily: 'Inter', fontSize: 12, fontWeight: 700, display: 'flex' }}>✕</span>
+                  </div>
+                )}
                 <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>/ {p.unidad}</div>
-              </button>
-            ))}
+                {esCustom && <div onClick={e => { e.stopPropagation(); restaurarPrecioGlobal(p.id); }} title="Restaurar precio global del admin" style={{ fontFamily: 'Inter', fontSize: 9, fontWeight: 600, color: C.green, marginTop: 3, cursor: 'pointer' }}>✓ precio propio — toca para restaurar</div>}
+              </div>
+              );
+            })}
           </div>
         </div>
 
