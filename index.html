@@ -2395,10 +2395,8 @@
       }, []);
 
       const [productoId, setProductoId] = useState(PRODUCTOS[0].id);
-      // Precios modificables SOLO por el trabajador (locale de este usuario, no afecta a otros ni al admin)
-      const [preciosLocal, setPreciosLocal] = useState(() => {
-        try { const s = localStorage.getItem('grifos_kala_precio_trab_' + usuario); return s ? JSON.parse(s) : {}; } catch { return {}; }
-      });
+      // Precio editable por el trabajador SOLO para la venta en curso (se reestablece al precio del admin al registrar el comprobante)
+      const [preciosLocal, setPreciosLocal] = useState({});
       const [editPrecioCard, setEditPrecioCard] = useState(null);
       const [valorPrecioCard, setValorPrecioCard] = useState('');
       function precioDe(p) {
@@ -2408,16 +2406,15 @@
       function guardarPrecioCard(id) {
         const n = Math.round((parseFloat(valorPrecioCard) || 0) * 100) / 100;
         if (!(n > 0)) return;
-        const nuevos = { ...preciosLocal, [id]: n };
-        setPreciosLocal(nuevos);
-        try { localStorage.setItem('grifos_kala_precio_trab_' + usuario, JSON.stringify(nuevos)); } catch {}
+        setPreciosLocal(prev => ({ ...prev, [id]: n }));
         setEditPrecioCard(null);
       }
       function restaurarPrecioGlobal(id) {
-        const nuevos = { ...preciosLocal };
-        delete nuevos[id];
-        setPreciosLocal(nuevos);
-        try { localStorage.setItem('grifos_kala_precio_trab_' + usuario, JSON.stringify(nuevos)); } catch {}
+        setPreciosLocal(prev => {
+          const nuevos = { ...prev };
+          delete nuevos[id];
+          return nuevos;
+        });
         setEditPrecioCard(null);
       }
       const [cantidad, setCantidad] = useState('');
@@ -2686,6 +2683,9 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
         setVentasWorker(prev => [...prev, ventaRegistrada]);
         imprimirComprobante(ventaRegistrada);
         setCarrito([]);
+        // Reestablecer precios a los del admin (el precio modificado solo aplicó a esta venta)
+        setPreciosLocal({});
+        setEditPrecioCard(null);
         setClienteNombre(''); setClienteDoc(''); setClienteDireccion(''); setClientePlaca('');
       }
 
@@ -2717,7 +2717,7 @@ ${esFactura ? `<div style='margin-bottom:${2*s}mm'>
                   </div>
                 )}
                 <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted }}>/ {p.unidad}</div>
-                {esCustom && <div onClick={e => { e.stopPropagation(); restaurarPrecioGlobal(p.id); }} title="Restaurar precio global del admin" style={{ fontFamily: 'Inter', fontSize: 9, fontWeight: 600, color: C.green, marginTop: 3, cursor: 'pointer' }}>✓ precio propio — toca para restaurar</div>}
+                {esCustom && <div onClick={e => { e.stopPropagation(); restaurarPrecioGlobal(p.id); }} title="Restaurar precio del admin (se reestablece solo al registrar)" style={{ fontFamily: 'Inter', fontSize: 9, fontWeight: 600, color: C.green, marginTop: 3, cursor: 'pointer' }}>⚡ precio solo en esta venta — se reestablece al registrar</div>}
               </div>
               );
             })}
