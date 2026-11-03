@@ -943,7 +943,6 @@
       try { window.dispatchEvent(new Event('preciosActualizados')); } catch {}
     }
     function marcarPreciosSinc() { try { localStorage.setItem('grifos_kala_precios_sinc', '1'); } catch {} }
-    function preciosYaSinc() { try { return localStorage.getItem('grifos_kala_precios_sinc') === '1'; } catch { return false; } }
     // El admin edita un precio → sube a Supabase para que TODOS los dispositivos lo adopten
     function subirPreciosAlGrupo(grupoId, precio) {
       if (!supabase) return;
@@ -953,7 +952,14 @@
         .then(res => { if (!res.find(r => r && r.error)) marcarPreciosSinc(); nubePendientePrecios = false; })
         .catch(() => { nubePendientePrecios = false; });
     }
-    // Descarga los precios vigentes desde Supabase (nube canónica)
+    // ¿La nube todavía tiene los precios de fábrica (nadie del admin los ha publicado)?
+    function nubeIgualSemilla(nube) {
+      return PRODUCTOS_AGRUPADOS.every(g => (MAPA_GRUPO_CODIGOS[g.id] || [g.id])
+        .every(c => Number(nube[c]) === Number(g.precio)));
+    }
+    // Descarga los precios vigentes desde Supabase.
+    // LA NUBE ES LA ÚNICA FUENTE: todos los dispositivos y navegadores muestran
+    // exactamente lo que fijó el admin desde su panel. Nadie más escribe precios.
     function refrescarPreciosDesdeNube() {
       if (!supabase || nubePendientePrecios) return Promise.resolve();
       return supabase.from('productos').select('codigo, precio').eq('activo', true)
@@ -961,27 +967,35 @@
           if (error || !Array.isArray(data) || !data.length) return;
           const nube = {};
           data.forEach(p => { if (p.codigo != null && p.precio != null) nube[p.codigo] = Number(p.precio); });
-          if (!preciosYaSinc()) {
-            // Primera sincronización: SOLO el dispositivo con precios propios (el admin)
-            // los sube como canónicos; los demás adoptan la nube sin pisarla nunca.
-            const localesPrimera = leerPreciosLocal();
-            if (Object.keys(localesPrimera).length) {
+          const locales = leerPreciosLocal();
+
+          // ÚNICA escritura permitida fuera del panel admin: la nube aún está en los
+          // precios de fábrica y este dispositivo (el del admin) tiene precios propios
+          // distintos → se publican como canónicos de una sola vez.
+          const tienePropios = PRODUCTOS_AGRUPADOS.some(g => Number(locales[g.id]) > 0);
+          if (tienePropios && nubeIgualSemilla(nube)) {
+            const precioDe = g => { const l = Number(locales[g.id]); return l > 0 ? l : Number(g.precio); };
+            const difiere = PRODUCTOS_AGRUPADOS.some(g => (MAPA_GRUPO_CODIGOS[g.id] || [g.id])
+              .some(c => Number(nube[c]) !== precioDe(g)));
+            if (difiere) {
+              nubePendientePrecios = true;
               const ups = [];
               PRODUCTOS_AGRUPADOS.forEach(g => {
-                const local = localesPrimera[g.id];
-                const precio = (local != null && local > 0) ? Number(local) : Number(g.precio);
+                const precio = precioDe(g);
                 (MAPA_GRUPO_CODIGOS[g.id] || [g.id]).forEach(c => {
-                  if (nube[c] !== precio) ups.push(supabase.from('productos').update({ precio }).eq('codigo', c));
+                  if (Number(nube[c]) !== precio) ups.push(supabase.from('productos').update({ precio }).eq('codigo', c));
                 });
               });
-              if (!ups.length) { marcarPreciosSinc(); return; }
-              Promise.all(ups).then(res => { if (!res.find(r => r && r.error)) marcarPreciosSinc(); }).catch(() => {});
-              return;
+              Promise.all(ups)
+                .then(res => { if (!res.find(r => r && r.error)) marcarPreciosSinc(); })
+                .catch(() => {})
+                .then(() => { nubePendientePrecios = false; });
+              return; // es el dispositivo que manda: no se pisa a sí mismo
             }
-            marcarPreciosSinc(); // sin precios propios: adopta la nube (ver merge abajo)
           }
-          // Ya sincronizado: la nube manda → actualiza este dispositivo si difiere
-          const locales = leerPreciosLocal();
+
+          marcarPreciosSinc();
+          // Adopta SIEMPRE lo de la nube: ningún otro dispositivo la sobrescribe.
           const merge = { ...locales };
           Object.entries(nube).forEach(([codigo, precio]) => {
             merge[codigo === 'diesel4' ? 'diesel' : codigo] = precio;
