@@ -962,19 +962,23 @@
           const nube = {};
           data.forEach(p => { if (p.codigo != null && p.precio != null) nube[p.codigo] = Number(p.precio); });
           if (!preciosYaSinc()) {
-            // Primera sincronización: los precios que el admin ve AHORA en este dispositivo son los canónicos
-            const locales = leerPreciosLocal();
-            const ups = [];
-            PRODUCTOS_AGRUPADOS.forEach(g => {
-              const local = locales[g.id];
-              const precio = (local != null && local > 0) ? Number(local) : Number(g.precio);
-              (MAPA_GRUPO_CODIGOS[g.id] || [g.id]).forEach(c => {
-                if (nube[c] !== precio) ups.push(supabase.from('productos').update({ precio }).eq('codigo', c));
+            // Primera sincronización: SOLO el dispositivo con precios propios (el admin)
+            // los sube como canónicos; los demás adoptan la nube sin pisarla nunca.
+            const localesPrimera = leerPreciosLocal();
+            if (Object.keys(localesPrimera).length) {
+              const ups = [];
+              PRODUCTOS_AGRUPADOS.forEach(g => {
+                const local = localesPrimera[g.id];
+                const precio = (local != null && local > 0) ? Number(local) : Number(g.precio);
+                (MAPA_GRUPO_CODIGOS[g.id] || [g.id]).forEach(c => {
+                  if (nube[c] !== precio) ups.push(supabase.from('productos').update({ precio }).eq('codigo', c));
+                });
               });
-            });
-            if (!ups.length) { marcarPreciosSinc(); return; }
-            Promise.all(ups).then(res => { if (!res.find(r => r && r.error)) marcarPreciosSinc(); }).catch(() => {});
-            return;
+              if (!ups.length) { marcarPreciosSinc(); return; }
+              Promise.all(ups).then(res => { if (!res.find(r => r && r.error)) marcarPreciosSinc(); }).catch(() => {});
+              return;
+            }
+            marcarPreciosSinc(); // sin precios propios: adopta la nube (ver merge abajo)
           }
           // Ya sincronizado: la nube manda → actualiza este dispositivo si difiere
           const locales = leerPreciosLocal();
