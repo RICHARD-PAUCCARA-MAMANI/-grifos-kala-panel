@@ -344,20 +344,38 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlb2xvandob21hc21qd3lxbGVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NDEwODAsImV4cCI6MjEwNDAxNzA4MH0.N3QEpNYLRoA2oqOr8CstG96JszxtECsWwI7FeI_iuCE';
     
     // Inicializar cliente de Supabase
+    // ⚠️ Babel transpila let/const a var al ejecutar este script global, así que
+    // `supabase` compite con la librería en window.supabase y la pisaba (por eso
+    // antes nunca se conectaba). Guardamos la librería ANTES y verificamos que el
+    // cliente tenga el método .from antes de darlo por bueno.
+    const SUPABASE_LIB = (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') ? window.supabase : null;
     let supabase = null;
-    try {
-      if (SUPABASE_URL && SUPABASE_ANON_KEY && 
-          SUPABASE_URL !== 'YOUR_SUPABASE_URL' && 
-          SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY' &&
-          window.supabase && window.supabase.createClient) {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    function esClienteSupabase(v) { return !!(v && typeof v.from === 'function'); }
+    function initSupabaseCliente() {
+      if (esClienteSupabase(supabase)) return true;
+      const lib = SUPABASE_LIB ||
+        (window.supabase && typeof window.supabase.createClient === 'function' ? window.supabase : null);
+      if (!(SUPABASE_URL && SUPABASE_ANON_KEY &&
+            SUPABASE_URL !== 'YOUR_SUPABASE_URL' &&
+            SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY' && lib)) return false;
+      try {
+        supabase = lib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         console.log('✅ Supabase connected successfully');
-      } else {
-        console.warn('⚠️ Supabase not configured - using local data');
+        return true;
+      } catch (err) {
+        console.error('❌ Supabase initialization error:', err);
+        supabase = null;
+        return false;
       }
-    } catch (err) {
-      console.error('❌ Supabase initialization error:', err);
-      supabase = null;
+    }
+    initSupabaseCliente();
+    if (!esClienteSupabase(supabase)) {
+      console.warn('⚠️ Supabase not configured - using local data');
+      // Reintenta por si la librería terminó de cargar después de este script
+      let intentosSupabase = 0;
+      const reintentarSupabase = setInterval(() => {
+        if (initSupabaseCliente() || ++intentosSupabase >= 20) clearInterval(reintentarSupabase);
+      }, 250);
     }
     
     // Funciones de ayuda para Supabase
