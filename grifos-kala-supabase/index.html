@@ -79,7 +79,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23E8A33D'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='%2312161A'>⛽</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,500;1,600&display=swap" rel="stylesheet" />
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/prop-types@15/prop-types.min.js"></script>
@@ -193,7 +193,8 @@
       .header-mobile {
         padding: 12px 14px !important;
         flex-direction: column !important;
-        gap: 8px !important;n      }
+        gap: 8px !important;
+n      }
       .header-mobile-inner {
         width: 100% !important;
         justify-content: space-between !important;
@@ -1340,6 +1341,110 @@
     }
 
     /* ===================== ADMIN: COMPROBANTES ===================== */
+    /* Documento del comprobante: jerarquía clara y tipografía serif elegante */
+    function ComprobanteDoc({ v }) {
+      const serif = "'Playfair Display', Georgia, serif";
+      const mono = "'JetBrains Mono', 'Courier New', monospace";
+      const esFactura = v.comp === 'Factura';
+      const lbl = { fontWeight: 700, letterSpacing: 0.7, color: '#6b6b6b', textTransform: 'uppercase' };
+      const thStyle = { fontSize: 7, fontWeight: 700, letterSpacing: 0.7, color: '#6b6b6b', textTransform: 'uppercase', borderBottom: '1.2px solid #111', padding: '0 0 4px' };
+      const tdStyle = { fontSize: 8.8, padding: '6px 0', borderBottom: '1px dashed #e8e3da', verticalAlign: 'top' };
+      const fila = (k, val) => (
+        <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'baseline', marginBottom: 4 }}>
+          <span style={{ ...lbl, fontSize: 7.6, width: 64, flexShrink: 0 }}>{k}</span>
+          <span style={{ fontSize: 9.5, fontWeight: 500, color: '#111', wordBreak: 'break-word' }}>{val}</span>
+        </div>
+      );
+      const sub = v.total / 1.18;
+      const igv = v.total - sub;
+      return (
+        <div style={{ background: '#fff', borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: '18px 18px 16px', fontFamily: "'Inter', system-ui, sans-serif", color: '#111', fontFeatureSettings: "'tnum' 1, 'lnum' 1", lineHeight: 1.45 }}>
+
+          {/* 1 · Encabezado de la empresa */}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontFamily: serif, fontSize: 21, fontWeight: 700, letterSpacing: 2.6, lineHeight: 1.1 }}>GRIFOS KALA</div>
+            <div style={{ fontSize: 8.6, fontWeight: 600, letterSpacing: 0.8, color: '#4a4a4a', marginTop: 7, textTransform: 'uppercase' }}>{EMPRESA.razonSocial}</div>
+            <div style={{ fontSize: 8.4, color: '#767676', marginTop: 6, lineHeight: 1.65 }}>
+              {EMPRESA.direccion}<br />{EMPRESA.distrito} · {EMPRESA.provincia} · {EMPRESA.ciudad}<br />TEL. {EMPRESA.telefono}
+            </div>
+          </div>
+          <div style={{ borderTop: '1px solid #e3ded5', margin: '13px 0 11px' }} />
+
+          {/* 2 · Identificación del documento */}
+          <div style={{ textAlign: 'center', borderTop: '1.5px solid #111', borderBottom: '1.5px solid #111', padding: '9px 0' }}>
+            <div style={{ ...lbl, fontSize: 7.4, letterSpacing: 1.5 }}>RUC {EMPRESA.ruc}</div>
+            <div style={{ fontFamily: serif, fontSize: 11.5, fontWeight: 700, letterSpacing: 1.7, textTransform: 'uppercase', marginTop: 6 }}>{esFactura ? 'Factura Electrónica' : 'Boleta Electrónica'}</div>
+            <div style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, letterSpacing: 0.9, marginTop: 4 }}>{esFactura ? (v.serieFactura || '—') : (v.serieBoleta || '—')}</div>
+          </div>
+
+          {/* 3 · Datos del cliente */}
+          <div style={{ margin: '13px 0 11px' }}>
+            {fila('Cliente', v.razonSocial || v.nombreCliente || 'Cliente varios')}
+            {fila(esFactura ? 'RUC' : 'DNI', esFactura ? (v.ruc || '—') : (v.dniCliente || '—'))}
+            {esFactura && fila('Dirección', v.direccion || '—')}
+            {v.placa && fila('Placa', v.placa)}
+          </div>
+
+          {/* 4 · Emisión */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 8.4, color: '#333', padding: '7px 0', borderTop: '1px dashed #ded7cb', borderBottom: '1px dashed #ded7cb' }}>
+            <span><span style={{ ...lbl, fontSize: 7.2 }}>Emisión </span>{v.fecha}</span>
+            <span><span style={{ ...lbl, fontSize: 7.2 }}>Hora </span>{v.hora}</span>
+            <span><span style={{ ...lbl, fontSize: 7.2 }}>Moneda </span>Soles</span>
+          </div>
+
+          {/* 5 · Detalle de productos */}
+          <div style={{ fontFamily: serif, fontSize: 9, fontWeight: 700, letterSpacing: 1.3, textTransform: 'uppercase', margin: '12px 0 5px' }}>Detalle</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontVariantNumeric: 'tabular-nums' }}>
+            <thead><tr>
+              <th style={{ ...thStyle, textAlign: 'right', width: 46 }}>Cant.</th>
+              <th style={{ ...thStyle, textAlign: 'left', width: 36, paddingLeft: 6 }}>UM</th>
+              <th style={{ ...thStyle, textAlign: 'left' }}>Descripción</th>
+              <th style={{ ...thStyle, textAlign: 'right', width: 44 }}>P.U.</th>
+              <th style={{ ...thStyle, textAlign: 'right', width: 52 }}>Importe</th>
+            </tr></thead>
+            <tbody>
+              {(v.items || []).map((item, idx) => (
+                <tr key={idx}>
+                  <td style={{ ...tdStyle, textAlign: 'right', paddingRight: 2 }}>{(parseFloat(item.cant) || 0).toFixed(2)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'left', color: '#6b6b6b', paddingLeft: 6 }}>{item.unidad === 'gal' ? 'GLL' : item.unidad === 'litros' ? 'LTR' : 'UNI'}</td>
+                  <td style={{ ...tdStyle, textTransform: 'uppercase', fontWeight: 600 }}>{item.producto || ''}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{(item.precioUnitario || 0).toFixed(2)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{item.total.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* 6 · Totales */}
+          {esFactura && (
+            <div style={{ marginTop: 9 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, fontSize: 8.6, color: '#555', marginBottom: 3 }}><span>Op. gravada</span><span style={{ width: 58, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{sub.toFixed(2)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, fontSize: 8.6, color: '#555' }}><span>IGV 18%</span><span style={{ width: 58, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{igv.toFixed(2)}</span></div>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1.5px solid #111', borderBottom: '1.5px solid #111', padding: '8px 0', marginTop: 7 }}>
+            <span style={{ fontFamily: serif, fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase' }}>Total a pagar</span>
+            <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: 0.3, fontVariantNumeric: 'tabular-nums' }}>S/ {v.total.toFixed(2)}</span>
+          </div>
+          <div style={{ fontSize: 8, color: '#555', margin: '9px 0 11px', lineHeight: 1.5 }}>{numeroALetras(v.total)}</div>
+
+          {/* 7 · Forma de pago */}
+          <div style={{ borderTop: '1px dashed #ded7cb', paddingTop: 9 }}>
+            <div style={{ fontFamily: serif, fontSize: 9, fontWeight: 700, letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 6 }}>Forma de pago</div>
+            {fila('Método', v.metodo || '—')}
+            {fila('Condición', 'Contado')}
+            {fila('Atendido', v.trabajador || '—')}
+          </div>
+
+          {/* 8 · Pie */}
+          <div style={{ textAlign: 'center', marginTop: 12, paddingTop: 10, borderTop: '1px dashed #ded7cb' }}>
+            <div style={{ fontSize: 7.4, color: '#8a8a8a', lineHeight: 1.7 }}>Representación impresa de la {esFactura ? 'Factura' : 'Boleta'} Electrónica<br />Consulte su comprobante en www.facel.pe</div>
+            <div style={{ fontFamily: serif, fontStyle: 'italic', fontSize: 11.5, fontWeight: 600, letterSpacing: 0.6, marginTop: 7 }}>Gracias por su preferencia</div>
+          </div>
+        </div>
+      );
+    }
+
     function ComprobantesAdmin({ estacion, ventas, setVentas, productos }) {
       const isMobile = useIsMobile();
       const [filtro, setFiltro] = useState('todos');
@@ -1584,65 +1689,14 @@
             <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
               <button onClick={() => { setShowEditar(null); setEditDatos(null); }} type="button" style={{ flex: 1, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, color: C.textDim, cursor: 'pointer' }}>Cancelar</button>
               <button onClick={guardarEdicion} type="button" style={{ flex: 1.5, background: C.amber, color: C.bg, border: 'none', borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>💾 Guardar cambios</button>
-            </div>          </div>
+            </div>
+          </div>
         </div>)}
 
         {/* MODAL VISTA PREVIA */}
         {showPreview && (<div onClick={() => setShowPreview(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, width: '100%', maxWidth: 360, maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ background: '#fff', borderRadius: '14px 14px 0 0', padding: '16px 20px', fontFamily: 'Courier New, monospace', fontSize: 10.5, color: '#000', lineHeight: 1.3 }}>
-              <div style={{ textAlign: 'center', marginBottom: 4 }}><span style={{ fontSize: '24px' }}>⛽</span></div>
-              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 16, letterSpacing: 1 }}>GRIFOS KALA</div>
-              <div style={{ textAlign: 'center', fontSize: 9, marginTop: 2 }}>{EMPRESA.razonSocial}</div>
-              <div style={{ textAlign: 'center', fontSize: 9 }}>{EMPRESA.direccion}</div>
-              <div style={{ textAlign: 'center', fontSize: 9 }}>{EMPRESA.distrito}</div>
-              <div style={{ textAlign: 'center', fontSize: 9 }}>TEL: {EMPRESA.telefono}</div>
-              <div style={{ borderTop: '2px dashed #000', margin: '8px 0' }} />
-              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 10 }}>RUC: {EMPRESA.ruc}</div>
-              <div style={{ borderTop: '2px dashed #000', margin: '8px 0' }} />
-              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 12 }}>{showPreview.comp === 'Factura' ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA'}</div>
-              <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 13, marginBottom: 4 }}>{showPreview.comp === 'Factura' ? showPreview.serieFactura : showPreview.serieBoleta}</div>
-              <div style={{ borderTop: '2px dashed #000', margin: '8px 0' }} />
-              <div style={{ fontSize: 10, lineHeight: 1.5 }}>
-                <div>CLIENTE : {showPreview.razonSocial || showPreview.nombreCliente || 'CLIENTE VARIOS'}</div>
-                {showPreview.comp === 'Factura' ? <div>RUC : {showPreview.ruc || '—'}</div> : <div>DNI : {showPreview.dniCliente || '—'}</div>}
-                {showPreview.comp === 'Factura' && <div>DIRECCIÓN: {showPreview.direccion || '—'}</div>}
-              </div>
-              <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}><span>F. EMISIÓN: {showPreview.fecha}</span><span>HORA: {showPreview.hora}</span></div>
-              <div style={{ fontSize: 10 }}>MONEDA: SOLES</div>
-              <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
-              <div style={{ display: 'flex', fontWeight: 'bold', fontSize: 9, borderBottom: '1px solid #000', paddingBottom: 3, marginBottom: 3 }}>
-                <span style={{ width: 35 }}>CANT</span><span style={{ width: 25 }}>UM</span><span style={{ flex: 1 }}>| DESCRIPCIÓN</span><span style={{ width: 40, textAlign: 'right' }}>P/U</span><span style={{ width: 50, textAlign: 'right' }}>TOTAL</span>
-              </div>
-              {(showPreview.items || []).map((item, idx) => {
-                const um = item.unidad === 'gal' ? 'GLL' : item.unidad === 'litros' ? 'LTR' : 'UNI';
-                return (<div key={idx} style={{ display: 'flex', fontSize: 10, padding: '1px 0' }}>
-                  <span style={{ width: 35 }}>{(parseFloat(item.cant) || 0).toFixed(2)}</span>
-                  <span style={{ width: 25 }}>{um}</span>
-                  <span style={{ flex: 1 }}>| {(item.producto || '').toUpperCase()}</span>
-                  <span style={{ width: 40, textAlign: 'right' }}>{item.precioUnitario?.toFixed(2) || '—'}</span>
-                  <span style={{ width: 50, textAlign: 'right' }}>{item.total.toFixed(2)}</span>
-                </div>);
-              })}
-              <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
-              {showPreview.comp === 'Factura' && <><div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 10 }}><span style={{ width: 100 }}>GRAVADA S/</span><span style={{ width: 55, textAlign: 'right' }}>{(showPreview.total / 1.18).toFixed(2)}</span></div><div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 10 }}><span style={{ width: 100 }}>IGV 18.00% S/</span><span style={{ width: 55, textAlign: 'right' }}>{(showPreview.total - showPreview.total / 1.18).toFixed(2)}</span></div></>}
-              <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', fontWeight: 'bold', fontSize: 13 }}><span style={{ width: 100 }}>TOTAL S/</span><span style={{ width: 55, textAlign: 'right' }}>{showPreview.total.toFixed(2)}</span></div>
-              <div style={{ borderTop: '2px dashed #000', margin: '6px 0' }} />
-              <div style={{ fontSize: 9.5, marginBottom: 4 }}><b>SON:</b> {numeroALetras(showPreview.total)}</div>
-              <div style={{ fontSize: 10, marginBottom: 3 }}>PAGO CON: {showPreview.metodo?.toUpperCase()} MONTO: {showPreview.total.toFixed(2)} VUELTO: 0</div>
-              <div style={{ fontSize: 10, marginBottom: 3 }}>CONDICIÓN DE PAGO: CONTADO</div>
-              {showPreview.placa && <div style={{ fontSize: 10, marginBottom: 3 }}>PLACA: {showPreview.placa}</div>}
-              <div style={{ fontSize: 10, marginBottom: 8 }}>ATENDIDO POR: {(showPreview.trabajador || '—').toUpperCase()}</div>
-              <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
-              <div style={{ textAlign: 'center', fontSize: 8, color: '#666', marginBottom: 4 }}>Representación impresa de la</div>
-              <div style={{ textAlign: 'center', fontSize: 8, color: '#666', marginBottom: 4 }}>{showPreview.comp === 'Factura' ? 'Factura Electrónica' : 'Boleta de Venta'}</div>
-              <div style={{ textAlign: 'center', fontSize: 8, color: '#666', marginBottom: 8 }}>consulte su comprobante en www.facel.pe</div>
-              <div style={{ borderTop: '2px dashed #000', margin: '6px 0' }} />
-              <div style={{ textAlign: 'center', fontSize: 10, fontWeight: 'bold' }}>¡Gracias por su preferencia!</div>
-              <div style={{ textAlign: 'center', fontSize: 8, color: '#666', marginTop: 4 }}>****************************************</div>
-            </div>
+          <div onClick={e => e.stopPropagation()} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 14, width: '100%', maxWidth: 384, maxHeight: '90vh', overflowY: 'auto' }}>
+            <ComprobanteDoc v={showPreview} />
             <div style={{ padding: '14px 20px', display: 'flex', gap: 8, borderBottomLeftRadius: 14, borderBottomRightRadius: 14, background: C.panel }}>
               <button onClick={() => setShowPreview(null)} type="button" style={{ flex: 1, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 0', fontFamily: 'Inter', fontSize: 13, color: C.textDim, cursor: 'pointer' }}>Cerrar</button>
             </div>
@@ -2788,7 +2842,7 @@
         const pageWidth = papel.page;
         const now = new Date();
         const fecha = now.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+        const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
         const esFactura = ventaRegistrada.comp === 'Factura';
         const esCotizacion = ventaRegistrada.comp === 'Cotización';
         const sub = (ventaRegistrada.total / 1.18);
@@ -2797,134 +2851,120 @@
         // Scale factor por ancho de papel (PAPELES_IMPRESION.escala): 48=0.89, 58=1, 72=1.16, 80=1.25, A4=2.2
         const s = papel.escala;
 
+        const fontSerif = "'Playfair Display', Georgia, 'Palatino Linotype', serif";
+        const wBody = isA4 ? 400 : 600;
+        const wLab = isA4 ? 600 : 700;
+        const padBody = isA4 ? '16mm 20mm' : `${3 * s}mm ${3 * s}mm`;
+        const umDe = (it) => it.unidad === 'gal' ? 'GLL' : it.unidad === 'litros' ? 'LTR' : (it.unidad ? String(it.unidad).toUpperCase().slice(0, 3) : 'GLL');
+        const tipoTexto = esFactura ? 'Factura Electrónica' : esCotizacion ? 'Cotización' : 'Boleta Electrónica';
+        const pieTexto = esCotizacion ? 'Cotización válida por 3 días' : `Representación impresa de la ${esFactura ? 'Factura' : 'Boleta'} Electrónica`;
+
         let itemsHtml = '';
         ventaRegistrada.items.forEach(it => {
-          itemsHtml += `<tr style='border-bottom:${1.5*s}px dotted #999'>
-            <td style='padding:${2*s}mm 0;font-weight:800;font-size:${10*s}px'>${it.producto}</td>
-            <td style='padding:${2*s}mm 0;text-align:right;font-weight:900;font-size:${11*s}px;white-space:nowrap'>S/ ${it.total.toFixed(2)}</td>
-          </tr>
-          <tr style='border-bottom:none'>
-            <td style='padding:0 0 ${2*s}mm ${2*s}mm;font-size:${8*s}px;color:#333;font-weight:700' colspan='2'>${parseFloat(it.cant).toFixed(2)} ${it.unidad || 'gal'} x S/ ${it.precioUnitario.toFixed(2)}</td>
+          itemsHtml += `<tr>
+            <td style='padding:${1.7 * s}mm 0;border-bottom:${0.6 * s}px dashed #d9d3c7;font-size:${9.6 * s}px;font-weight:${wLab};letter-spacing:${0.1 * s}px;vertical-align:top'>${it.producto}<div style='font-size:${7.4 * s}px;font-weight:${wBody};color:#5f5f5f;letter-spacing:${0.1 * s}px;margin-top:${0.6 * s}mm'>${parseFloat(it.cant).toFixed(2)} ${umDe(it)} &times; S/ ${it.precioUnitario.toFixed(2)}</div></td>
+            <td style='padding:${1.7 * s}mm 0;border-bottom:${0.6 * s}px dashed #d9d3c7;text-align:right;vertical-align:top;font-size:${10 * s}px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums'>S/ ${it.total.toFixed(2)}</td>
           </tr>`;
         });
 
-        const fontStack = isA4 ? "'Georgia', 'Palatino Linotype', 'Book Antiqua', Palatino, serif" : "'Arial Narrow', Impact, 'Arial Black', 'Helvetica Neue', Arial, sans-serif";
-        const padBody = isA4 ? '15mm 20mm' : `${3*s}mm ${3*s}mm`;
-
         const htmlComp = `<!DOCTYPE html><html><head><meta charset='utf-8'><title>Comprobante</title>
-<link href='https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;600;700;900&display=swap' rel='stylesheet'>
+<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@700&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap' rel='stylesheet'>
 <style>
   @page { size: ${pageWidth}; margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: ${fontStack}; padding: ${padBody}; width: ${bodyWidth}; font-size: ${9*s}px; font-weight: 400; color: #000; background: #fff; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; letter-spacing: ${0.2*s}px; }
+  body { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; padding: ${padBody}; width: ${bodyWidth}; font-size: ${9 * s}px; font-weight: ${wBody}; color: #141414; background: #fff; line-height: 1.45; font-variant-numeric: tabular-nums; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .c { text-align: center; }
-  .b { font-weight: 700; }
-  .sep { border-top: ${1*s}px dashed #000; margin: ${2*s}mm 0; }
-  .sep2 { border-top: ${2.5*s}px solid #000; margin: ${2*s}mm 0; }
-  .sep3 { border-top: ${1*s}px solid #999; margin: ${1.5*s}mm 0; }
-  .row { display: flex; justify-content: space-between; align-items: baseline; }
-  .row-label { display: flex; gap: ${2*s}mm; align-items: baseline; }
-  .label { font-weight: 700; text-transform: uppercase; white-space: nowrap; }
-  .small { font-size: ${7*s}px; font-weight: 400; }
-  .big { font-size: ${12*s}px; font-weight: 700; }
-  .total-box { border: ${2*s}px solid #000; padding: ${2*s}mm ${3*s}mm; margin: ${2*s}mm 0; }
-  .total-row { font-size: ${12*s}px; font-weight: 900; }
+  .marca { font-family: ${fontSerif}; font-size: ${20 * s}px; font-weight: 700; letter-spacing: ${2.4 * s}px; line-height: 1.1; color: #111; }
+  .razon { font-size: ${8.6 * s}px; font-weight: 600; letter-spacing: ${0.7 * s}px; color: #3d3d3d; text-transform: uppercase; }
+  .mini { font-size: ${7.6 * s}px; font-weight: ${wBody}; color: #6a6a6a; line-height: 1.6; }
+  .rule { border-top: ${0.7 * s}px solid #c9c2b5; margin: ${2.2 * s}mm 0; }
+  .rule-dash { border-top: ${0.7 * s}px dashed #b9b2a4; margin: ${2 * s}mm 0; }
+  .doc { border-top: ${1.4 * s}px solid #111; border-bottom: ${1.4 * s}px solid #111; padding: ${1.8 * s}mm 0; margin: ${2.2 * s}mm 0; }
+  .doc-t { font-family: ${fontSerif}; font-size: ${11 * s}px; font-weight: 700; letter-spacing: ${1.6 * s}px; text-transform: uppercase; margin-top: ${1 * s}mm; }
+  .serie { font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: ${11.5 * s}px; font-weight: 700; letter-spacing: ${0.8 * s}px; margin-top: ${0.8 * s}mm; }
+  .k { font-size: ${7.4 * s}px; font-weight: 700; letter-spacing: ${0.6 * s}px; text-transform: uppercase; color: #6a6a6a; white-space: nowrap; }
+  .v { font-size: ${9 * s}px; font-weight: ${wBody}; color: #141414; }
+  .kv { display: flex; align-items: baseline; gap: ${1.6 * s}mm; margin: ${0.6 * s}mm 0; }
+  .kv .v { flex: 1; }
+  .sec { font-family: ${fontSerif}; font-size: ${9.6 * s}px; font-weight: 700; letter-spacing: ${1.3 * s}px; text-transform: uppercase; margin-bottom: ${1.2 * s}mm; color: #111; }
   table { width: 100%; border-collapse: collapse; }
-  th { font-size: ${7*s}px; font-weight: 700; text-transform: uppercase; border-bottom: ${1*s}px solid #000; padding: ${1*s}mm 0; text-align: left; }
-  td { padding: ${0.8*s}mm 0; font-size: ${8*s}px; font-weight: 400; }
-  .th-r { text-align: right; }
-  .td-r { text-align: right; }
-  .cut { border-top: ${1.5*s}px dashed #000; margin-top: ${3*s}mm; padding-top: ${2*s}mm; text-align: center; font-size: ${7*s}px; color: #666; }
+  th { font-size: ${7 * s}px; font-weight: 700; letter-spacing: ${0.6 * s}px; text-transform: uppercase; color: #6a6a6a; border-bottom: ${1 * s}px solid #111; padding: 0 0 ${1 * s}mm; text-align: left; }
+  .num { text-align: right; white-space: nowrap; }
+  .tot { display: flex; justify-content: space-between; align-items: baseline; font-size: ${8.6 * s}px; color: #555; margin-bottom: ${0.4 * s}mm; }
+  .tot-box { display: flex; justify-content: space-between; align-items: baseline; border-top: ${1.4 * s}px solid #111; border-bottom: ${1.4 * s}px solid #111; padding: ${1.6 * s}mm 0; margin: ${1.6 * s}mm 0; }
+  .tot-l { font-family: ${fontSerif}; font-size: ${10.5 * s}px; font-weight: 700; letter-spacing: ${1.5 * s}px; text-transform: uppercase; }
+  .tot-v { font-size: ${13 * s}px; font-weight: 800; letter-spacing: ${0.2 * s}px; }
+  .son { font-size: ${8 * s}px; font-weight: ${wBody}; color: #3d3d3d; line-height: 1.55; }
+  .son b { font-weight: 700; color: #111; }
+  .gracias { font-family: ${fontSerif}; font-style: italic; font-size: ${11.5 * s}px; font-weight: 600; letter-spacing: ${0.6 * s}px; color: #111; }
+  .cut { border-top: ${0.8 * s}px dashed #b9b2a4; margin-top: ${3 * s}mm; padding-top: ${1.5 * s}mm; text-align: center; font-size: ${6.5 * s}px; letter-spacing: ${1.2 * s}px; color: #9a9a9a; }
   @media print { body { padding: ${padBody}; width: ${bodyWidth}; } }
 </style></head><body>
 
-<!-- ═══ ENCABEZADO ═══ -->
+<!-- 1 · EMPRESA -->
 <div class='c'>
-  <div style='font-family:Playfair Display,Georgia,serif;font-size:${22*s}px;font-weight:900;letter-spacing:${1*s}px;color:#1a1a1a'>GRIFOS KALA</div>
-  <div style='font-size:${10*s}px;font-weight:900;margin-top:${1*s}mm;color:#333'>${EMPRESA.razonSocial}</div>
-  <div style='font-size:${8*s}px;font-weight:400;margin-top:${1*s}mm;color:#555'>${EMPRESA.direccion}</div>
-  <div style='font-size:${8*s}px;font-weight:400;color:#555'>${EMPRESA.distrito} - ${EMPRESA.provincia} - ${EMPRESA.ciudad}</div>
-  <div style='font-size:${8*s}px;font-weight:600;color:#333'>TEL: ${EMPRESA.telefono}</div>
+  <div class='marca'>GRIFOS KALA</div>
+  <div class='razon' style='margin-top:${1.2 * s}mm'>${EMPRESA.razonSocial}</div>
+  <div class='mini' style='margin-top:${1 * s}mm'>${EMPRESA.direccion}<br>${EMPRESA.distrito} · ${EMPRESA.provincia} · ${EMPRESA.ciudad}<br>TEL. ${EMPRESA.telefono}</div>
+</div>
+<div class='rule'></div>
+
+<!-- 2 · DOCUMENTO -->
+<div class='doc c'>
+  <div class='k' style='letter-spacing:${1.4 * s}px'>RUC ${EMPRESA.ruc}</div>
+  <div class='doc-t'>${tipoTexto}</div>
+  <div class='serie'>${ventaRegistrada.serie}</div>
 </div>
 
-<div class='sep'></div>
-
-<div class='c'>
-  <div style='font-size:${11*s}px;font-weight:900;color:#1a1a1a'>RUC: ${EMPRESA.ruc}</div>
+<!-- 3 · CLIENTE -->
+<div>
+  <div class='kv'><span class='k'>Cliente</span><span class='v'>${ventaRegistrada.clienteNombre || 'CLIENTE VARIOS'}</span></div>
+  ${(ventaRegistrada.clienteDoc || !esCotizacion) ? `<div class='kv'><span class='k'>${esFactura ? 'RUC' : 'DNI'}</span><span class='v'>${ventaRegistrada.clienteDoc || '---'}</span></div>` : ''}
+  ${ventaRegistrada.clienteDireccion ? `<div class='kv'><span class='k'>Dirección</span><span class='v'>${ventaRegistrada.clienteDireccion}</span></div>` : ''}
+  ${ventaRegistrada.clientePlaca ? `<div class='kv'><span class='k'>Placa</span><span class='v'>${ventaRegistrada.clientePlaca}</span></div>` : ''}
 </div>
 
-<div class='sep'></div>
-<div class='sep2'></div>
-
-<!-- ═══ TIPO DE COMPROBANTE ═══ -->
-<div class='c'>
-  <div style='font-family:Playfair Display,Georgia,serif;font-size:${13*s}px;font-weight:900;letter-spacing:${1.5*s}px;color:#1a1a1a'>${esFactura ? 'FACTURA ELECTRÓNICA' : esCotizacion ? 'COTIZACIÓN' : 'BOLETA ELECTRÓNICA'}</div>
-  <div style='font-size:${14*s}px;font-weight:900;margin-top:${1*s}mm;color:#000'>${ventaRegistrada.serie}</div>
+<!-- 4 · EMISIÓN -->
+<div class='rule-dash'></div>
+<div>
+  <div class='kv'><span class='k'>Emisión</span><span class='v'>${fecha} &middot; ${hora}</span></div>
+  <div class='kv'><span class='k'>Moneda</span><span class='v'>Soles</span></div>
 </div>
+<div class='rule-dash'></div>
 
-<div class='sep'></div>
-<div class='sep2'></div>
-
-<!-- ═══ DATOS DEL CLIENTE ═══ -->
-<div style='margin-bottom:${2*s}mm'>
-  <div style='font-size:${10*s}px;font-weight:700;line-height:2;color:#1a1a1a'>
-    <div class='row-label'><span class='label'>CLIENTE</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clienteNombre || 'CLIENTE VARIOS'}</span></div>
-    ${(ventaRegistrada.clienteDoc || !esCotizacion) ? `<div class='row-label'><span class='label'>${esFactura ? 'RUC' : 'DNI'}</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clienteDoc || '---'}</span></div>` : ''}
-    ${ventaRegistrada.clienteDireccion ? `<div class='row-label'><span class='label'>DIRECCIÓN</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clienteDireccion}</span></div>` : ''}
-    ${ventaRegistrada.clientePlaca ? `<div class='row-label'><span class='label'>PLACA</span><span style='font-weight:400;color:#333'>: ${ventaRegistrada.clientePlaca}</span></div>` : ''}
-  </div>
-</div>
-${esCotizacion ? `<div style='text-align:center;font-size:${8*s}px;font-weight:700;color:#333;margin-bottom:${2*s}mm'>*** COTIZACIÓN VÁLIDA POR 3 DÍAS ***</div>` : ''}
-
-<div class='sep3'></div>
-
-<!-- ═══ FECHA Y HORA ═══ -->
-<div style='font-size:${9*s}px;font-weight:400;line-height:1.6'>
-  <div class='row-label'><span class='label'>F. EMISIÓN</span><span style='color:#333'>: ${fecha}</span><span style='margin-left:auto;font-weight:900'>HORA: ${hora}</span></div>
-  <div class='row-label'><span class='label'>MONEDA</span><span style='color:#333'>: SOLES</span></div>
-</div>
-
-<div class='sep'></div>
-
-<!-- ═══ DETALLE DE PRODUCTOS ═══ -->
-<div style='font-size:${10*s}px;font-weight:900;letter-spacing:${1*s}px;color:#1a1a1a;margin-bottom:${2*s}mm'>DETALLE DE PRODUCTOS</div>
+<!-- 5 · DETALLE -->
+<div class='sec'>Detalle de productos</div>
 <table>
-  <thead><tr><th class='th' style='text-align:left'>Descripción</th><th class='th' style='text-align:right;width:${18*s}mm'>Total</th></tr></thead>
+  <thead><tr><th>Descripción</th><th class='num' style='width:${19 * s}mm'>Importe</th></tr></thead>
   <tbody>${itemsHtml}</tbody>
 </table>
 
-<div class='sep'></div>
-
-<!-- ═══ TOTALES ═══ -->
-${esFactura ? `<div style='margin-bottom:${2*s}mm'>
-  <div class='row' style='font-size:${10*s}px;font-weight:700'><span style='color:#555'>Base:</span><span>S/ ${sub.toFixed(2)}</span></div>
-  <div class='row' style='font-size:${10*s}px;font-weight:700'><span style='color:#555'>IGV 18%:</span><span>S/ ${igv.toFixed(2)}</span></div>
+<!-- 6 · TOTALES -->
+${esFactura ? `<div style='margin-top:${2 * s}mm'>
+  <div class='tot'><span>Op. gravada</span><span>S/ ${sub.toFixed(2)}</span></div>
+  <div class='tot'><span>IGV 18%</span><span>S/ ${igv.toFixed(2)}</span></div>
 </div>` : ''}
-<div class='total-box'>
-  <div class='row total-row'><span style='letter-spacing:${1*s}px'>TOTAL</span><span>S/ ${ventaRegistrada.total.toFixed(2)}</span></div>
+<div class='tot-box'>
+  <span class='tot-l'>Total</span>
+  <span class='tot-v'>S/ ${ventaRegistrada.total.toFixed(2)}</span>
 </div>
-<div style='font-size:${9*s}px;font-weight:600;margin:${2*s}mm 0;color:#333;line-height:1.6'>Son: <b style='color:#000'>${numeroALetras(ventaRegistrada.total)}</b></div>
+<div class='son'>${numeroALetras(ventaRegistrada.total)}</div>
+<div class='rule-dash'></div>
 
-<div class='sep'></div>
+<!-- 7 · FORMA DE PAGO -->
+<div class='sec'>Forma de pago</div>
+<div class='kv'><span class='k'>Método</span><span class='v'>${ventaRegistrada.metodo}</span></div>
+<div class='kv'><span class='k'>Condición</span><span class='v'>Contado</span></div>
+<div class='kv'><span class='k'>Atendido</span><span class='v'>${ventaRegistrada.trabajador}</span></div>
+<div class='rule-dash'></div>
 
-<!-- ═══ FORMA DE PAGO ═══ -->
-<div style='margin-bottom:${2.5*s}mm'>
-  <div style='font-size:${10*s}px;font-weight:900;letter-spacing:${1*s}px;color:#1a1a1a;margin-bottom:${1.5*s}mm'>FORMA DE PAGO</div>
-  <div style='font-size:${10*s}px;font-weight:700;line-height:1.8'>
-    <div class='row'><span style='color:#555'>Pago:</span><span class='b'>${ventaRegistrada.metodo}</span></div>
-    <div class='row'><span style='color:#555'>Atendido:</span><span class='b'>${ventaRegistrada.trabajador}</span></div>
-  </div>
-</div>
-
-<div class='sep'></div>
-
-<!-- ═══ PIE ═══ -->
-<div class='c small' style='line-height:1.6;color:#666'>Rep. impresa de la ${esFactura ? 'factura' : 'boleta'}<br>electrónica</div>
-<div class='c' style='margin-top:${4*s}mm;font-family:Playfair Display,Georgia,serif;font-size:${14*s}px;font-weight:900;letter-spacing:${0.5*s}px;color:#1a1a1a'>¡GRACIAS!</div>
-
-<div class='cut'>✂ - - - - - - - - - - - - ✂</div>
+<!-- 8 · PIE -->
+<div class='c mini'>${pieTexto}<br>Consulte su comprobante en www.facel.pe</div>
+<div class='c' style='margin-top:${3 * s}mm'><span class='gracias'>Gracias por su preferencia</span></div>
+<div class='cut'>· · · · · · · · · · · · · ·</div>
 
 </body></html>`;
+
         setPreviewHTML(htmlComp);
       }
 
