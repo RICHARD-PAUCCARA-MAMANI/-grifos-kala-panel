@@ -943,6 +943,22 @@
       try { window.dispatchEvent(new Event('preciosActualizados')); } catch {}
     }
     function marcarPreciosSinc() { try { localStorage.setItem('grifos_kala_precios_sinc', '1'); } catch {} }
+    /* ---------- Sesión (se mantiene al refrescar hasta que el usuario salga) ---------- */
+    const SESION_LS_KEY = 'grifos_kala_sesion';
+    function leerSesion() {
+      try {
+        const s = localStorage.getItem(SESION_LS_KEY);
+        const o = s ? JSON.parse(s) : null;
+        if (o && (o.screen === 'worker' || o.screen === 'admin') && o.usuario) {
+          return { screen: o.screen, rol: o.rol === 'admin' ? 'admin' : 'trabajador', usuario: String(o.usuario) };
+        }
+      } catch {}
+      return null;
+    }
+    function guardarSesion(s) {
+      try { if (s) localStorage.setItem(SESION_LS_KEY, JSON.stringify(s)); else localStorage.removeItem(SESION_LS_KEY); } catch {}
+    }
+    const SESION_INICIAL = leerSesion();
     // El admin edita un precio → sube a Supabase para que TODOS los dispositivos lo adopten
     function subirPreciosAlGrupo(grupoId, precio) {
       if (!supabase) return;
@@ -4111,9 +4127,10 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
 
     /* ===================== MAIN APP ===================== */
     function App({ themeDark, setThemeDark }) {
-      const [screen, setScreen] = useState('login');
-      const [rol, setRol] = useState('trabajador');
-      const [usuario, setUsuario] = useState('');
+      // La sesión sobrevive a recargas/cierre de pestaña: solo se pierde al pulsar Salir
+      const [screen, setScreen] = useState(SESION_INICIAL ? SESION_INICIAL.screen : 'login');
+      const [rol, setRol] = useState(SESION_INICIAL ? SESION_INICIAL.rol : 'trabajador');
+      const [usuario, setUsuario] = useState(SESION_INICIAL ? SESION_INICIAL.usuario : '');
       const [seccion, setSeccion] = useState('resumen');
       const [estacion, setEstacion] = useState(ESTACIONES[0]);
       const isMobile = useIsMobile();
@@ -4167,14 +4184,23 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
       ]);
 
       function handleLogin(rolElegido, user) {
+        const destino = rolElegido === 'admin' ? 'admin' : 'worker';
         setRol(rolElegido);
         setUsuario(user);
-        setScreen(rolElegido === 'admin' ? 'admin' : 'worker');
+        setScreen(destino);
+        guardarSesion({ screen: destino, rol: rolElegido, usuario: user });
         if (rolElegido === 'admin') setSeccion('resumen');
+      }
+      // Único punto que borra la sesión guardada (botones Salir)
+      function cerrarSesion() {
+        guardarSesion(null);
+        setUsuario('');
+        setRol('trabajador');
+        setScreen('login');
       }
 
       if (screen === 'login') return <LoginScreen onLogin={handleLogin} />;
-      if (screen === 'worker') return (<WorkerDashboard usuario={usuario} estacion={estacion} onLogout={() => setScreen('login')} onToggleTheme={toggleTheme} themeDark={themeDark} />);
+      if (screen === 'worker') return (<WorkerDashboard usuario={usuario} estacion={estacion} onLogout={cerrarSesion} onToggleTheme={toggleTheme} themeDark={themeDark} />);
 
       const adminTabs = [
         { id: 'resumen', label: 'Resumen', Icon: I.LayoutDashboard },
@@ -4197,7 +4223,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
               <button onClick={toggleTheme} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: isMobile ? '8px 10px' : '7px 14px', borderRadius: 8, background: C.amberSoft, border: `1.5px solid ${C.amber}`, color: C.amber, cursor: 'pointer', fontFamily: 'Inter', fontSize: isMobile ? 11 : 12, fontWeight: 600, minHeight: 36, flexShrink: 0, whiteSpace: 'nowrap' }}>
                 <WI.Sun size={14} color={C.amber} /> {themeDark ? 'Claro' : 'Oscuro'}
               </button>
-              <button onClick={() => setScreen('login')} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? '8px 10px' : '7px 14px', color: C.red, cursor: 'pointer', fontFamily: 'Inter', fontSize: isMobile ? 11 : 12, fontWeight: 600, minHeight: 36, flexShrink: 0, whiteSpace: 'nowrap' }}>
+              <button onClick={cerrarSesion} type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: isMobile ? '8px 10px' : '7px 14px', color: C.red, cursor: 'pointer', fontFamily: 'Inter', fontSize: isMobile ? 11 : 12, fontWeight: 600, minHeight: 36, flexShrink: 0, whiteSpace: 'nowrap' }}>
                 <I.LogOut size={14} color={C.red} /> {!isMobile && 'Salir'}
               </button>
             </div>
