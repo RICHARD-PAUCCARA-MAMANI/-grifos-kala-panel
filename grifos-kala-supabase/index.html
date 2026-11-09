@@ -933,6 +933,156 @@ n      }
         .catch(() => {});
     }
 
+    /* ===================== DOCUMENTOS DEL CONDUCTOR / VEHÍCULO =====================
+       Se guardan en la tabla `documentos_vehiculo` de Supabase (con caché local) para
+       que el admin los suba y el trabajador reciba el aviso de vencimiento. */
+    const DOCS_LS_KEY = 'grifos_kala_docs_vehiculos';
+    const DIAS_AVISO_DOC = 7;   // aviso una semana antes del vencimiento
+    const TIPOS_DOC = [
+      { id: 'licencia', label: 'Licencia de conducir', emoji: '🪪' },
+      { id: 'dni', label: 'DNI', emoji: '🆔' },
+      { id: 'soat', label: 'SOAT', emoji: '🛡️' },
+      { id: 'revision', label: 'Revisión técnica', emoji: '🔧' },
+      { id: 'extintores', label: 'Certificado de extintores', emoji: '🧯' },
+      { id: 'poliza', label: 'Póliza de seguro', emoji: '📑' },
+    ];
+    let nubePendienteDocs = false;
+
+    function leerDocsLocal() {
+      try { return JSON.parse(localStorage.getItem(DOCS_LS_KEY)) || []; } catch { return []; }
+    }
+    function escribirDocsLocal(lista) {
+      try {
+        localStorage.setItem(DOCS_LS_KEY, JSON.stringify(lista));
+      } catch {
+        // Sin espacio local: conserva los metadatos y deja el archivo solo en la nube
+        try { localStorage.setItem(DOCS_LS_KEY, JSON.stringify(lista.map(d => ({ ...d, archivo: d.archivo && d.archivo.length < 120000 ? d.archivo : '' })))); } catch {}
+      }
+      try { window.dispatchEvent(new Event('kalaDocsActualizados')); } catch {}
+    }
+    function aFilaDoc(d) {
+      return {
+        id: String(d.id), vehiculo_id: String(d.vehiculoId || ''), vehiculo_nombre: d.vehiculoNombre || '',
+        placa: d.placa || '', estacion: d.estacion || '', tipo: d.tipo || '', titular: d.titular || '',
+        vence: d.vence || '', archivo_tipo: d.archivoTipo || '', archivo_nombre: d.archivoNombre || '',
+        archivo_url: d.archivo || '', subido_por: d.subidoPor || '', subido_en: d.subidoEn || '',
+      };
+    }
+    function deFilaDoc(r) {
+      return {
+        id: String(r.id), vehiculoId: r.vehiculo_id, vehiculoNombre: r.vehiculo_nombre, placa: r.placa,
+        estacion: r.estacion, tipo: r.tipo, titular: r.titular, vence: r.vence, archivoTipo: r.archivo_tipo,
+        archivoNombre: r.archivo_nombre, archivo: r.archivo_url, subidoPor: r.subido_por, subidoEn: r.subido_en, sinc: 1,
+      };
+    }
+    function guardarDocVehiculo(doc) {
+      const lista = [doc, ...leerDocsLocal().filter(d => !(String(d.vehiculoId) === String(doc.vehiculoId) && d.tipo === doc.tipo))];
+      escribirDocsLocal(lista);
+      if (supabase) {
+        nubePendienteDocs = true;
+        supabase.from('documentos_vehiculo').upsert(aFilaDoc(doc), { onConflict: 'id' })
+          .then(res => {
+            if (res && res.error) window.alert('El documento quedó guardado en este equipo, pero no en la nube:\n' + res.error.message + '\n\nEjecuta el SQL de documentos_vehiculo para sincronizarlo.');
+            nubePendienteDocs = false;
+          })
+          .catch(() => { nubePendienteDocs = false; });
+      }
+      return lista;
+    }
+    function eliminarDocVehiculo(id) {
+      const lista = leerDocsLocal().filter(d => String(d.id) !== String(id));
+      escribirDocsLocal(lista);
+      if (supabase) supabase.from('documentos_vehiculo').delete().eq('id', String(id)).catch(() => {});
+      return lista;
+    }
+    // Baja los documentos de la nube y los mezcla con la caché local
+    function refrescarDocsDesdeNube() {
+      if (!supabase || nubePendienteDocs) return Promise.resolve();
+      return supabase.from('documentos_vehiculo').select('*').limit(500)
+        .then(({ data, error }) => {
+          if (error || !Array.isArray(data)) return;
+          const locales = leerDocsLocal();
+          const idsNube = new Set(data.map(r => String(r.id)));
+          const soloLocal = locales.filter(d => !d.sinc && !idsNube.has(String(d.id)));
+          if (soloLocal.length) supabase.from('documentos_vehiculo').upsert(soloLocal.map(aFilaDoc), { onConflict: 'id' }).catch(() => {});
+          const copiaLocal = new Map(locales.map(d => [String(d.id), d]));
+          const nube = data.map(r => {
+            const d = deFilaDoc(r);
+            const local = copiaLocal.get(d.id);
+            return local && local.archivo ? { ...d, archivo: local.archivo } : d;
+          });
+          escribirDocsLocal([...soloLocal, ...nube]);
+        })
+        .catch(() => {});
+    }
+    // Días que faltan para el vencimiento (0 = hoy, negativo = ya venció)
+    function diasParaVencer(vence) {
+      if (!vence) return null;
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+      const v = new Date(String(vence).length === 10 ? vence + 'T00:00:00' : vence);
+      if (isNaN(v.getTime())) return null;
+      return Math.round((v.getTime() - hoy.getTime()) / 86400000);
+    }
+    function estadoDoc(doc) {
+      const d = diasParaVencer(doc && doc.vence);
+      if (d === null) return { key: 'sin_fecha', label: 'Sin vencimiento', color: C.muted, bg: C.panelLight };
+      if (d < 0) return { key: 'vencido', label: 'Vencido hace ' + Math.abs(d) + ' d', color: C.red, bg: C.redSoft };
+      if (d === 0) return { key: 'hoy', label: 'Vence hoy', color: C.red, bg: C.redSoft };
+      if (d <= DIAS_AVISO_DOC) return { key: 'por_vencer', label: 'Vence en ' + d + ' d', color: C.amber, bg: C.amberSoft };
+      return { key: 'vigente', label: 'Vigente', color: C.green, bg: C.greenSoft };
+    }
+    function docsPorVencer(docs) {
+      return (docs || [])
+        .filter(d => { const n = diasParaVencer(d.vence); return n !== null && n <= DIAS_AVISO_DOC; })
+        .sort((a, b) => diasParaVencer(a.vence) - diasParaVencer(b.vence));
+    }
+    function fechaCorta(iso) {
+      if (!iso) return '—';
+      const p = String(iso).slice(0, 10).split('-');
+      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso);
+    }
+    // Convierte el archivo elegido en imagen comprimida o PDF en dataURL
+    function comprimirDocumento(file) {
+      return new Promise(resolve => {
+        const esPdf = file.type === 'application/pdf';
+        if (esPdf) {
+          if (file.size > 3 * 1024 * 1024) { resolve({ error: 'El PDF pesa más de 3 MB. Comprímelo o sube una foto del documento.' }); return; }
+          const fr = new FileReader();
+          fr.onload = () => resolve({ archivo: fr.result, tipo: 'application/pdf', nombre: file.name });
+          fr.onerror = () => resolve({ error: 'No se pudo leer el PDF.' });
+          fr.readAsDataURL(file);
+          return;
+        }
+        if (!file.type.startsWith('image/')) { resolve({ error: 'Sube una imagen (JPG/PNG) o un PDF.' }); return; }
+        const fr = new FileReader();
+        fr.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const MAX = 1400;
+            const r = Math.min(1, MAX / Math.max(img.width, img.height));
+            const cv = document.createElement('canvas');
+            cv.width = Math.round(img.width * r); cv.height = Math.round(img.height * r);
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            resolve({ archivo: cv.toDataURL('image/jpeg', 0.72), tipo: 'image/jpeg', nombre: file.name.replace(/\.[^.]+$/, '') + '.jpg' });
+          };
+          img.onerror = () => resolve({ error: 'La imagen no se pudo procesar.' });
+          img.src = fr.result;
+        };
+        fr.onerror = () => resolve({ error: 'No se pudo leer la imagen.' });
+        fr.readAsDataURL(file);
+      });
+    }
+    function dataUrlABlobUrl(dataUrl) {
+      const s = String(dataUrl || '');
+      const i = s.indexOf(',');
+      if (i < 0) return '';
+      const mime = (s.slice(0, i).match(/data:([^;]+)/) || [])[1] || 'application/octet-stream';
+      const bin = atob(s.slice(i + 1));
+      const bytes = new Uint8Array(bin.length);
+      for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
+      return URL.createObjectURL(new Blob([bytes], { type: mime }));
+    }
+
     /* ---------- Precios de productos (admin manda) — nube ---------- */
     let nubePendientePrecios = false;
     const MAPA_GRUPO_CODIGOS = { diesel: ['diesel', 'diesel4'], regular: ['regular'], urea: ['urea'] };
@@ -2363,6 +2513,214 @@ n      }
     }
 
     /* ===================== ADMIN: REPORTES ===================== */
+    /* ===================== VISTA PREVIA DE UN DOCUMENTO ===================== */
+    function ModalVerDocumento({ doc, onClose }) {
+      const [url, setUrl] = useState('');
+      useEffect(() => {
+        let u = '';
+        try { if (doc && doc.archivo) u = dataUrlABlobUrl(doc.archivo); } catch { u = ''; }
+        setUrl(u);
+        return () => { if (u) { try { URL.revokeObjectURL(u); } catch {} } };
+      }, [doc]);
+      if (!doc) return null;
+      const tipo = TIPOS_DOC.find(t => t.id === doc.tipo) || { label: doc.tipo, emoji: '📄' };
+      const est = estadoDoc(doc);
+      const esPdf = String(doc.archivoTipo || '').includes('pdf');
+      return (
+        <div onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '14px 12px', overflowY: 'auto' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 900, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <span style={{ fontSize: 18 }}>{tipo.emoji}</span>
+                <span style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 700, color: '#F3EFE6' }}>{tipo.label}</span>
+                <span style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: '#B7BEC4' }}>{doc.placa || doc.vehiculoNombre}</span>
+                <span style={{ fontFamily: 'Inter', fontSize: 10.5, fontWeight: 600, background: est.bg, color: est.color, padding: '2px 8px', borderRadius: 5 }}>{est.label}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {url && <a href={url} download={doc.archivoNombre || 'documento'} style={{ padding: '9px 14px', borderRadius: 8, background: 'none', border: '1px solid #555E66', color: '#B7BEC4', fontFamily: 'Inter', fontSize: 12.5, fontWeight: 600, textDecoration: 'none' }}>⬇ Descargar</a>}
+                <button onClick={onClose} type="button" style={{ padding: '9px 14px', borderRadius: 8, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>✕ Cerrar</button>
+              </div>
+            </div>
+            <div style={{ background: '#2A333B', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 220 }}>
+              {!url ? (
+                <div style={{ fontFamily: 'Inter', fontSize: 12, color: '#B7BEC4', textAlign: 'center', padding: 30 }}>Este documento aún no tiene el archivo descargado en este equipo.<br />Conéctate para verlo desde la nube.</div>
+              ) : esPdf ? (
+                <iframe src={url} title="Vista previa documento" style={{ width: '100%', height: '76vh', border: 'none', borderRadius: 6, background: '#fff' }} />
+              ) : (
+                <img src={url} alt={tipo.label} style={{ maxWidth: '100%', maxHeight: '76vh', borderRadius: 6, background: '#fff', objectFit: 'contain' }} />
+              )}
+            </div>
+            <div style={{ fontFamily: 'Inter', fontSize: 11, color: '#7C868D', textAlign: 'center' }}>
+              {tipo.label} · Vence: {fechaCorta(doc.vence)}{doc.titular ? ' · ' + doc.titular : ''}{doc.subidoPor ? ' · Subido por ' + doc.subidoPor : ''}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ===================== SECCIÓN DOCUMENTOS DENTRO DE UN VEHÍCULO ===================== */
+    function DocumentosVehiculo({ vehiculo, estacion, usuario }) {
+      const [docs, setDocs] = useState(() => leerDocsLocal());
+      const [abierto, setAbierto] = useState(false);
+      const [subiendo, setSubiendo] = useState(null);
+      const [borrador, setBorrador] = useState({ vence: '', titular: '', archivo: '', archivoTipo: '', archivoNombre: '' });
+      const [cargando, setCargando] = useState(false);
+      const [verDoc, setVerDoc] = useState(null);
+      const fileRef = useRef(null);
+
+      useEffect(() => {
+        const sync = () => setDocs(leerDocsLocal());
+        window.addEventListener('kalaDocsActualizados', sync);
+        window.addEventListener('storage', sync);
+        refrescarDocsDesdeNube();
+        return () => { window.removeEventListener('kalaDocsActualizados', sync); window.removeEventListener('storage', sync); };
+      }, []);
+
+      const mios = docs.filter(d => String(d.vehiculoId) === String(vehiculo.id));
+      const docDe = tipo => mios.filter(d => d.tipo === tipo).sort((a, b) => String(b.subidoEn || '').localeCompare(String(a.subidoEn || '')))[0];
+      const pendientes = docsPorVencer(mios).length;
+
+      function abrirSubida(tipo) {
+        const actual = docDe(tipo);
+        setSubiendo({ tipo });
+        setBorrador({ vence: actual ? actual.vence || '' : '', titular: actual ? actual.titular || '' : '', archivo: '', archivoTipo: '', archivoNombre: '' });
+      }
+      async function elegirArchivo(e) {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        setCargando(true);
+        const r = await comprimirDocumento(f);
+        setCargando(false);
+        if (r.error) { window.alert(r.error); return; }
+        setBorrador(b => ({ ...b, archivo: r.archivo, archivoTipo: r.tipo, archivoNombre: r.nombre }));
+      }
+      function guardarDoc() {
+        if (!borrador.archivo) { window.alert('Selecciona la imagen o el PDF del documento.'); return; }
+        const tipo = TIPOS_DOC.find(t => t.id === subiendo.tipo);
+        const doc = {
+          id: 'doc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          vehiculoId: String(vehiculo.id), vehiculoNombre: vehiculo.nombre, placa: vehiculo.placa, estacion,
+          tipo: tipo.id, titular: borrador.titular.trim(), vence: borrador.vence || '',
+          archivo: borrador.archivo, archivoTipo: borrador.archivoTipo, archivoNombre: borrador.archivoNombre,
+          subidoPor: usuario || 'Admin', subidoEn: new Date().toISOString(),
+        };
+        const anterior = docDe(tipo.id);
+        if (anterior) eliminarDocVehiculo(anterior.id);
+        setDocs(guardarDocVehiculo(doc));
+        setSubiendo(null);
+      }
+
+      const btnMini = { background: 'none', border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: C.textDim, fontFamily: 'Inter', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 };
+
+      return (<div style={{ marginTop: 12, background: C.bg, borderRadius: 8, padding: '12px', border: `1px solid ${pendientes ? C.amber + '66' : C.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={() => setAbierto(!abierto)} type="button" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.text, fontFamily: 'Inter', fontSize: 12, fontWeight: 700 }}>
+            <I.FileText size={14} color={C.amber} /> Documentos del conductor
+            <span style={{ fontFamily: 'Inter', fontSize: 11, fontWeight: 500, color: C.muted }}>({mios.length}/{TIPOS_DOC.length})</span>
+            {pendientes > 0 && <span style={{ fontFamily: 'Inter', fontSize: 10.5, fontWeight: 700, background: C.amberSoft, color: C.amber, padding: '2px 7px', borderRadius: 5 }}>⚠ {pendientes} por vencer</span>}
+            <I.ChevronDown size={14} color={C.muted} style={{ transform: abierto ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+          </button>
+          {!abierto && <span style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.muted }}>Licencia, DNI, SOAT, revisión técnica, extintores y póliza</span>}
+        </div>
+
+        {abierto && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+            {TIPOS_DOC.map(t => {
+              const d = docDe(t.id);
+              const est = d ? estadoDoc(d) : null;
+              const subiendoEste = subiendo && subiendo.tipo === t.id;
+              return (
+                <div key={t.id} style={{ background: C.panel, borderRadius: 8, border: `1px solid ${d && (est.key === 'vencido' || est.key === 'hoy' || est.key === 'por_vencer') ? est.color + '88' : C.border}`, padding: '8px 10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    {d && String(d.archivoTipo || '').startsWith('image') && d.archivo ? (
+                      <img src={d.archivo} alt={t.label} onClick={() => setVerDoc(d)} style={{ width: 34, height: 44, objectFit: 'cover', borderRadius: 4, border: `1px solid ${C.border}`, cursor: 'zoom-in', flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 34, height: 44, borderRadius: 4, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0, background: C.panelLight }}>{d ? (String(d.archivoTipo || '').includes('pdf') ? '📄' : '📎') : t.emoji}</div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 120 }}>
+                      <div style={{ fontFamily: 'Inter', fontSize: 12, fontWeight: 600, color: C.text }}>{t.emoji} {t.label}</div>
+                      <div style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.muted }}>
+                        {d ? <>Vence: <b style={{ fontFamily: 'JetBrains Mono', color: C.textDim }}>{fechaCorta(d.vence)}</b>{d.titular ? ' · ' + d.titular : ''}</> : 'Sin documento cargado'}
+                      </div>
+                    </div>
+                    {est && <span style={{ fontFamily: 'Inter', fontSize: 10.5, fontWeight: 700, background: est.bg, color: est.color, padding: '2px 8px', borderRadius: 5, whiteSpace: 'nowrap' }}>{est.label}</span>}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {d && <button onClick={() => setVerDoc(d)} type="button" style={btnMini}><I.Eye size={12} /> Ver</button>}
+                      <button onClick={() => abrirSubida(t.id)} type="button" style={{ ...btnMini, color: C.amber, borderColor: C.amber + '55' }}><I.FilePlus size={12} /> {d ? 'Reemplazar' : 'Subir'}</button>
+                      {d && <button onClick={() => { if (window.confirm('¿Eliminar el documento ' + t.label + '?')) setDocs(eliminarDocVehiculo(d.id)); }} type="button" title="Eliminar documento" style={{ ...btnMini, color: C.red, borderColor: C.red + '55', padding: '4px 6px' }}><WI.Trash2 size={12} /></button>}
+                    </div>
+                  </div>
+
+                  {subiendoEste && (
+                    <div style={{ marginTop: 8, borderTop: `1px dashed ${C.border}`, paddingTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                      <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={elegirArchivo} style={{ display: 'none' }} />
+                      <button onClick={() => fileRef.current && fileRef.current.click()} type="button" style={{ ...btnMini, color: C.text, padding: '7px 10px' }}>
+                        <I.FilePlus size={13} /> {cargando ? 'Procesando…' : (borrador.archivo ? 'Cambiar archivo' : 'Elegir archivo')}
+                      </button>
+                      {borrador.archivoNombre && <span style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.teal, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{borrador.archivoNombre}</span>}
+                      <div>
+                        <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginBottom: 3, textTransform: 'uppercase' }}>Vence</div>
+                        <input type="date" value={borrador.vence} onChange={e => setBorrador(b => ({ ...b, vence: e.target.value }))} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 8px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 11.5 }} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 130 }}>
+                        <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginBottom: 3, textTransform: 'uppercase' }}>Conductor / titular</div>
+                        <input type="text" placeholder="Ej: Milagros Condori" value={borrador.titular} onChange={e => setBorrador(b => ({ ...b, titular: e.target.value }))} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 8px', color: C.text, fontFamily: 'Inter', fontSize: 11.5, boxSizing: 'border-box' }} />
+                      </div>
+                      <button onClick={guardarDoc} type="button" style={{ padding: '7px 12px', borderRadius: 6, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>Guardar</button>
+                      <button onClick={() => setSubiendo(null)} type="button" style={{ padding: '7px 10px', borderRadius: 6, background: 'none', border: `1px solid ${C.border}`, color: C.muted, fontFamily: 'Inter', fontSize: 11.5, cursor: 'pointer' }}>Cancelar</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.muted, marginTop: 2 }}>Aviso automático 7 días antes del vencimiento al admin y al trabajador.</div>
+          </div>
+        )}
+
+        {verDoc && <ModalVerDocumento doc={verDoc} onClose={() => setVerDoc(null)} />}
+      </div>);
+    }
+
+    /* ===================== AVISO DE DOCUMENTOS POR VENCER (ADMIN Y TRABAJADOR) ===================== */
+    function AlertaDocumentosVencen({ estacion, rol }) {
+      const [docs, setDocs] = useState(() => leerDocsLocal());
+      useEffect(() => {
+        const sync = () => setDocs(leerDocsLocal());
+        window.addEventListener('kalaDocsActualizados', sync);
+        window.addEventListener('storage', sync);
+        refrescarDocsDesdeNube();
+        const iv = setInterval(() => refrescarDocsDesdeNube(), 60000);
+        return () => { window.removeEventListener('kalaDocsActualizados', sync); window.removeEventListener('storage', sync); clearInterval(iv); };
+      }, []);
+      const pendientes = docsPorVencer((docs || []).filter(d => !estacion || d.estacion === estacion));
+      if (!pendientes.length) return null;
+      const vencidos = pendientes.filter(d => diasParaVencer(d.vence) < 0).length;
+      const color = vencidos > 0 ? C.red : C.amber;
+      return (
+        <div style={{ background: vencidos > 0 ? C.redSoft : C.amberSoft, border: `1px solid ${color}66`, borderRadius: 12, padding: '12px 14px', marginBottom: 14, display: 'flex', gap: 10 }}>
+          <I.AlertTriangle size={18} color={color} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'Inter', fontSize: 12.5, fontWeight: 700, color: C.text }}>
+              {vencidos > 0 ? '⛔ Documentos vencidos' : '⏰ Documentos por vencer'} ({pendientes.length})
+              <span style={{ fontWeight: 400, color: C.muted }}> — {rol === 'trabajador' ? 'avisa al administrador para renovarlos' : 'renueva antes de la fecha'}</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {pendientes.slice(0, 6).map(d => {
+                const t = TIPOS_DOC.find(x => x.id === d.tipo) || { label: d.tipo, emoji: '📄' };
+                const est = estadoDoc(d);
+                return (
+                  <span key={d.id} style={{ fontFamily: 'Inter', fontSize: 11, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 8px', color: C.textDim }}>
+                    {t.emoji} {t.label} · <b style={{ fontFamily: 'JetBrains Mono', color: C.text }}>{d.placa || d.vehiculoNombre}</b> · <b style={{ color: est.color }}>{est.label}</b>
+                  </span>
+                );
+              })}
+              {pendientes.length > 6 && <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>+{pendientes.length - 6} más</span>}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     function VehiculosAdmin({ estacion }) {
       const isMobile = useIsMobile();
       const [vehiculos, setVehiculos] = useState(() => {
@@ -2590,6 +2948,9 @@ n      }
                     )}
                   </div>
                 )}
+
+                {/* ===== DOCUMENTOS DEL CONDUCTOR (licencia, DNI, SOAT, revisión, extintores, póliza) ===== */}
+                <DocumentosVehiculo vehiculo={v} estacion={estacion} usuario="Admin" />
               </div>
             ))}
           </div>
@@ -4112,6 +4473,11 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
           ))}
         </div>
 
+        {/* ===== AVISO DE DOCUMENTOS POR VENCER (también lo ve el trabajador) ===== */}
+        <div style={{ padding: isMobile ? '10px 12px 0' : '14px 20px 0', maxWidth: 1200, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+          <AlertaDocumentosVencen estacion={estacion} rol="trabajador" />
+        </div>
+
         {/* ===== MOBILE SIDEBAR TOGGLE ===== */}
         {isMobile && (
           <div style={{ padding: '8px 12px', display: 'flex', gap: 8 }}>
@@ -4300,6 +4666,7 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
         {/* CONTENT */}
         <div style={{ flex: 1, padding: isMobile ? '14px 12px' : '22px 20px', paddingBottom: isMobile ? '80px' : '22px' }}>
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+            <AlertaDocumentosVencen estacion={estacion} />
             {seccion === 'resumen' && <ResumenAdmin estacion={estacion} />}
             {seccion === 'tanques' && <ControlTanquesAdmin estacion={estacion} />}
             {seccion === 'comprobantes' && <ComprobantesAdmin estacion={estacion} ventas={ventas} setVentas={setVentas} productos={PRODUCTOS} />}

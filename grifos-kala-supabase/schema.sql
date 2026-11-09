@@ -223,6 +223,30 @@ CREATE TABLE IF NOT EXISTS vehiculos (
   actualizado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 14. Documentos del conductor/vehículo (licencia, DNI, SOAT, revisión técnica,
+--     certificado de extintores y póliza de seguro). Se comparten admin <-> trabajador
+--     para avisar 7 días antes del vencimiento.
+CREATE TABLE IF NOT EXISTS documentos_vehiculo (
+  id TEXT PRIMARY KEY,                  -- id generado en el navegador
+  vehiculo_id TEXT,
+  vehiculo_nombre TEXT,
+  placa TEXT,
+  estacion TEXT,
+  tipo TEXT,                            -- licencia | dni | soat | revision | extintores | poliza
+  titular TEXT,                         -- conductor / titular del documento
+  vence TEXT,                           -- 'YYYY-MM-DD'
+  archivo_tipo TEXT,                    -- image/jpeg | application/pdf
+  archivo_nombre TEXT,
+  archivo_url TEXT,                     -- imagen/PDF en dataURL (comprimido en el navegador)
+  subido_por TEXT,
+  subido_en TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE documentos_vehiculo;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- Habilitar cambios en tiempo real (sincronización inmediata entre paneles)
 DO $$ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE varillado_registros;
