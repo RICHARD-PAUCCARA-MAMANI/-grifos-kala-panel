@@ -946,7 +946,9 @@ n      }
       { id: 'extintores', label: 'Certificado de extintores', emoji: '🧯' },
       { id: 'poliza', label: 'Póliza de seguro', emoji: '📑' },
     ];
+    const DOCS_BORRADOS_KEY = 'grifos_kala_docs_borrados';
     let nubePendienteDocs = false;
+    let avisoNubeDocsMostrado = false;
 
     function leerDocsLocal() {
       try { return JSON.parse(localStorage.getItem(DOCS_LS_KEY)) || []; } catch { return []; }
@@ -975,42 +977,120 @@ n      }
         archivoNombre: r.archivo_nombre, archivo: r.archivo_url, subidoPor: r.subido_por, subidoEn: r.subido_en, sinc: 1,
       };
     }
+    function leerBorradosDoc() {
+      try { return JSON.parse(localStorage.getItem(DOCS_BORRADOS_KEY)) || []; } catch { return []; }
+    }
+    function marcarBorradoDoc(id) {
+      try {
+        const l = leerBorradosDoc().filter(x => x !== String(id));
+        l.push(String(id));
+        localStorage.setItem(DOCS_BORRADOS_KEY, JSON.stringify(l.slice(-300)));
+      } catch {}
+    }
+    function quitarBorradoDoc(id) {
+      try { localStorage.setItem(DOCS_BORRADOS_KEY, JSON.stringify(leerBorradosDoc().filter(x => x !== String(id)))); } catch {}
+    }
+    // Marca un documento como sincronizado (o pendiente) sin tocar el resto de sus datos
+    function marcarSincDoc(id, ok) {
+      const lista = leerDocsLocal().map(d => String(d.id) === String(id) ? { ...d, sinc: ok ? 1 : 0 } : d);
+      escribirDocsLocal(lista);
+      return lista;
+    }
+    function avisarNubeDocs(error) {
+      if (avisoNubeDocsMostrado) return;
+      avisoNubeDocsMostrado = true;
+      window.alert('El documento quedó guardado en este equipo, pero todavía no en la nube.\n' +
+        (error ? error + '\n\n' : '\n') +
+        'Se subirá solo en cuanto el proyecto tenga la tabla documentos_vehiculo (ejecuta el SQL de schema.sql en Supabase).');
+    }
     function guardarDocVehiculo(doc) {
-      const lista = [doc, ...leerDocsLocal().filter(d => !(String(d.vehiculoId) === String(doc.vehiculoId) && d.tipo === doc.tipo))];
+      const nuevo = { ...doc, sinc: 0 };
+      const lista = [nuevo, ...leerDocsLocal().filter(d => !(String(d.vehiculoId) === String(nuevo.vehiculoId) && d.tipo === nuevo.tipo))];
       escribirDocsLocal(lista);
       if (supabase) {
         nubePendienteDocs = true;
-        supabase.from('documentos_vehiculo').upsert(aFilaDoc(doc), { onConflict: 'id' })
+        supabase.from('documentos_vehiculo').upsert(aFilaDoc(nuevo), { onConflict: 'id' })
           .then(res => {
-            if (res && res.error) window.alert('El documento quedó guardado en este equipo, pero no en la nube:\n' + res.error.message + '\n\nEjecuta el SQL de documentos_vehiculo para sincronizarlo.');
             nubePendienteDocs = false;
+            if (res && res.error) avisarNubeDocs(res.error.message);
+            else marcarSincDoc(nuevo.id, true);
+          })
+          .catch(() => { nubePendienteDocs = false; });
+      }
+      return lista;
+    }
+    // Edita fecha de vencimiento, titular o el archivo de un documento ya cargado
+    function actualizarDocVehiculo(id, cambios) {
+      let actualizado = null;
+      const lista = leerDocsLocal().map(d => {
+        if (String(d.id) !== String(id)) return d;
+        actualizado = { ...d, ...cambios, sinc: 0, actualizadoEn: new Date().toISOString() };
+        return actualizado;
+      });
+      escribirDocsLocal(lista);
+      if (supabase && actualizado) {
+        nubePendienteDocs = true;
+        supabase.from('documentos_vehiculo').upsert(aFilaDoc(actualizado), { onConflict: 'id' })
+          .then(res => {
+            nubePendienteDocs = false;
+            if (res && res.error) avisarNubeDocs(res.error.message);
+            else marcarSincDoc(id, true);
           })
           .catch(() => { nubePendienteDocs = false; });
       }
       return lista;
     }
     function eliminarDocVehiculo(id) {
+      marcarBorradoDoc(id);
       const lista = leerDocsLocal().filter(d => String(d.id) !== String(id));
       escribirDocsLocal(lista);
-      if (supabase) supabase.from('documentos_vehiculo').delete().eq('id', String(id)).catch(() => {});
+      if (supabase) {
+        supabase.from('documentos_vehiculo').delete().eq('id', String(id))
+          .then(res => { if (!res || !res.error) quitarBorradoDoc(id); })
+          .catch(() => {});
+      }
       return lista;
     }
-    // Baja los documentos de la nube y los mezcla con la caché local
+    // Reintenta subir los documentos que quedaron solo en este equipo
+    function subirDocsPendientes() {
+      const vacio = { ok: true, n: 0 };
+      if (!supabase) return Promise.resolve({ ok: false, n: 0, error: 'Sin conexión con Supabase.' });
+      const pend = leerDocsLocal().filter(d => !d.sinc);
+      if (!pend.length) return Promise.resolve(vacio);
+      return supabase.from('documentos_vehiculo').upsert(pend.map(aFilaDoc), { onConflict: 'id' })
+        .then(res => {
+          if (!res || res.error) return { ok: false, n: 0, error: res && res.error ? res.error.message : '' };
+          const ids = new Set(pend.map(d => String(d.id)));
+          escribirDocsLocal(leerDocsLocal().map(d => ids.has(String(d.id)) ? { ...d, sinc: 1 } : d));
+          return { ok: true, n: pend.length };
+        })
+        .catch(e => ({ ok: false, n: 0, error: e && e.message ? e.message : '' }));
+    }
+    // Sube lo pendiente, borra lo eliminado y baja los documentos de la nube
     function refrescarDocsDesdeNube() {
       if (!supabase || nubePendienteDocs) return Promise.resolve();
-      return supabase.from('documentos_vehiculo').select('*').limit(500)
+      const borrados = leerBorradosDoc();
+      if (borrados.length) {
+        supabase.from('documentos_vehiculo').delete().in('id', borrados)
+          .then(res => { if (!res || !res.error) borrados.forEach(quitarBorradoDoc); })
+          .catch(() => {});
+      }
+      return subirDocsPendientes()
+        .then(() => supabase.from('documentos_vehiculo').select('*').limit(500))
         .then(({ data, error }) => {
           if (error || !Array.isArray(data)) return;
           const locales = leerDocsLocal();
+          const omitir = new Set(leerBorradosDoc());
           const idsNube = new Set(data.map(r => String(r.id)));
-          const soloLocal = locales.filter(d => !d.sinc && !idsNube.has(String(d.id)));
-          if (soloLocal.length) supabase.from('documentos_vehiculo').upsert(soloLocal.map(aFilaDoc), { onConflict: 'id' }).catch(() => {});
+          const soloLocal = locales.filter(d => !idsNube.has(String(d.id)) && !omitir.has(String(d.id)));
           const copiaLocal = new Map(locales.map(d => [String(d.id), d]));
-          const nube = data.map(r => {
-            const d = deFilaDoc(r);
-            const local = copiaLocal.get(d.id);
-            return local && local.archivo ? { ...d, archivo: local.archivo } : d;
-          });
+          const nube = data
+            .filter(r => !omitir.has(String(r.id)))
+            .map(r => {
+              const d = deFilaDoc(r);
+              const local = copiaLocal.get(d.id);
+              return local && local.archivo ? { ...d, archivo: local.archivo } : d;
+            });
           escribirDocsLocal([...soloLocal, ...nube]);
         })
         .catch(() => {});
@@ -2579,10 +2659,11 @@ n      }
       const mios = docs.filter(d => String(d.vehiculoId) === String(vehiculo.id));
       const docDe = tipo => mios.filter(d => d.tipo === tipo).sort((a, b) => String(b.subidoEn || '').localeCompare(String(a.subidoEn || '')))[0];
       const pendientes = docsPorVencer(mios).length;
+      const sinSubir = mios.filter(d => !d.sinc).length;
 
-      function abrirSubida(tipo) {
+      function abrirSubida(tipo, editar) {
         const actual = docDe(tipo);
-        setSubiendo({ tipo });
+        setSubiendo({ tipo, editar: !!(editar && actual) });
         setBorrador({ vence: actual ? actual.vence || '' : '', titular: actual ? actual.titular || '' : '', archivo: '', archivoTipo: '', archivoNombre: '' });
       }
       async function elegirArchivo(e) {
@@ -2595,8 +2676,23 @@ n      }
         setBorrador(b => ({ ...b, archivo: r.archivo, archivoTipo: r.tipo, archivoNombre: r.nombre }));
       }
       function guardarDoc() {
-        if (!borrador.archivo) { window.alert('Selecciona la imagen o el PDF del documento.'); return; }
         const tipo = TIPOS_DOC.find(t => t.id === subiendo.tipo);
+        const anterior = docDe(tipo.id);
+        // Edición: cambia fecha, titular o (si se eligió otro) el archivo
+        if (subiendo.editar && anterior) {
+          const cambios = { vence: borrador.vence || '', titular: borrador.titular.trim() };
+          if (borrador.archivo) {
+            cambios.archivo = borrador.archivo;
+            cambios.archivoTipo = borrador.archivoTipo;
+            cambios.archivoNombre = borrador.archivoNombre;
+            cambios.subidoPor = usuario || 'Admin';
+            cambios.subidoEn = new Date().toISOString();
+          }
+          setDocs(actualizarDocVehiculo(anterior.id, cambios));
+          setSubiendo(null);
+          return;
+        }
+        if (!borrador.archivo) { window.alert('Selecciona la imagen o el PDF del documento.'); return; }
         const doc = {
           id: 'doc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
           vehiculoId: String(vehiculo.id), vehiculoNombre: vehiculo.nombre, placa: vehiculo.placa, estacion,
@@ -2604,10 +2700,23 @@ n      }
           archivo: borrador.archivo, archivoTipo: borrador.archivoTipo, archivoNombre: borrador.archivoNombre,
           subidoPor: usuario || 'Admin', subidoEn: new Date().toISOString(),
         };
-        const anterior = docDe(tipo.id);
         if (anterior) eliminarDocVehiculo(anterior.id);
         setDocs(guardarDocVehiculo(doc));
         setSubiendo(null);
+      }
+      async function reintentarNube() {
+        setCargando(true);
+        const r = await subirDocsPendientes();
+        setCargando(false);
+        if (r.ok && r.n) {
+          window.alert(r.n + ' documento' + (r.n > 1 ? 's subidos' : ' subido') + ' a la nube. Ya se ve desde cualquier equipo.');
+          refrescarDocsDesdeNube();
+        } else if (r.ok) {
+          window.alert('Todo está sincronizado con la nube.');
+        } else {
+          window.alert('Todavía no se puede subir a la nube.\n' + (r.error || '') +
+            '\n\nFalta crear la tabla documentos_vehiculo en Supabase: abre el SQL Editor y ejecuta el SQL de schema.sql.');
+        }
       }
 
       const btnMini = { background: 'none', border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 8px', cursor: 'pointer', color: C.textDim, fontFamily: 'Inter', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 };
@@ -2640,22 +2749,21 @@ n      }
                     <div style={{ flex: 1, minWidth: 120 }}>
                       <div style={{ fontFamily: 'Inter', fontSize: 12, fontWeight: 600, color: C.text }}>{t.emoji} {t.label}</div>
                       <div style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.muted }}>
-                        {d ? <>Vence: <b style={{ fontFamily: 'JetBrains Mono', color: C.textDim }}>{fechaCorta(d.vence)}</b>{d.titular ? ' · ' + d.titular : ''}</> : 'Sin documento cargado'}
+                        {d ? <>Vence: <b style={{ fontFamily: 'JetBrains Mono', color: C.textDim }}>{fechaCorta(d.vence)}</b>{d.titular ? ' · ' + d.titular : ''}{!d.sinc ? <span title="Se subirá a la nube automáticamente" style={{ color: C.amber }}> · ☁ sin subir</span> : null}</> : 'Sin documento cargado'}
                       </div>
                     </div>
                     {est && <span style={{ fontFamily: 'Inter', fontSize: 10.5, fontWeight: 700, background: est.bg, color: est.color, padding: '2px 8px', borderRadius: 5, whiteSpace: 'nowrap' }}>{est.label}</span>}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {d && <button onClick={() => setVerDoc(d)} type="button" style={btnMini}><I.Eye size={12} /> Ver</button>}
-                      <button onClick={() => abrirSubida(t.id)} type="button" style={{ ...btnMini, color: C.amber, borderColor: C.amber + '55' }}><I.FilePlus size={12} /> {d ? 'Reemplazar' : 'Subir'}</button>
+                      {d && <button onClick={() => abrirSubida(t.id, true)} type="button" title="Cambiar fecha de vencimiento o titular" style={btnMini}><I.Pencil size={12} /> Editar</button>}
+                      <button onClick={() => abrirSubida(t.id, false)} type="button" style={{ ...btnMini, color: C.amber, borderColor: C.amber + '55' }}><I.FilePlus size={12} /> {d ? 'Reemplazar' : 'Subir'}</button>
                       {d && <button onClick={() => { if (window.confirm('¿Eliminar el documento ' + t.label + '?')) setDocs(eliminarDocVehiculo(d.id)); }} type="button" title="Eliminar documento" style={{ ...btnMini, color: C.red, borderColor: C.red + '55', padding: '4px 6px' }}><WI.Trash2 size={12} /></button>}
                     </div>
-                  </div>
-
-                  {subiendoEste && (
+                  </div>                      {subiendoEste && (
                     <div style={{ marginTop: 8, borderTop: `1px dashed ${C.border}`, paddingTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                       <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={elegirArchivo} style={{ display: 'none' }} />
                       <button onClick={() => fileRef.current && fileRef.current.click()} type="button" style={{ ...btnMini, color: C.text, padding: '7px 10px' }}>
-                        <I.FilePlus size={13} /> {cargando ? 'Procesando…' : (borrador.archivo ? 'Cambiar archivo' : 'Elegir archivo')}
+                        <I.FilePlus size={13} /> {cargando ? 'Procesando…' : (borrador.archivo ? 'Cambiar archivo' : (subiendo.editar ? 'Cambiar archivo (opcional)' : 'Elegir archivo'))}
                       </button>
                       {borrador.archivoNombre && <span style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.teal, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{borrador.archivoNombre}</span>}
                       <div>
@@ -2666,13 +2774,19 @@ n      }
                         <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginBottom: 3, textTransform: 'uppercase' }}>Conductor / titular</div>
                         <input type="text" placeholder="Ej: Milagros Condori" value={borrador.titular} onChange={e => setBorrador(b => ({ ...b, titular: e.target.value }))} style={{ width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 8px', color: C.text, fontFamily: 'Inter', fontSize: 11.5, boxSizing: 'border-box' }} />
                       </div>
-                      <button onClick={guardarDoc} type="button" style={{ padding: '7px 12px', borderRadius: 6, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>Guardar</button>
+                      <button onClick={guardarDoc} type="button" style={{ padding: '7px 12px', borderRadius: 6, background: C.amber, color: C.bg, border: 'none', fontFamily: 'Inter', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>{subiendo.editar ? 'Guardar cambios' : 'Guardar'}</button>
                       <button onClick={() => setSubiendo(null)} type="button" style={{ padding: '7px 10px', borderRadius: 6, background: 'none', border: `1px solid ${C.border}`, color: C.muted, fontFamily: 'Inter', fontSize: 11.5, cursor: 'pointer' }}>Cancelar</button>
                     </div>
                   )}
                 </div>
               );
             })}
+            {sinSubir > 0 && (
+              <div style={{ marginTop: 2, padding: '7px 10px', borderRadius: 6, background: C.amberSoft, border: `1px solid ${C.amber}44`, fontFamily: 'Inter', fontSize: 10.5, color: C.amber, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <span>☁ {sinSubir} documento{sinSubir > 1 ? 's' : ''} solo en este equipo. Se {sinSubir > 1 ? 'subirán' : 'subirá'} automáticamente a la nube.</span>
+                <button onClick={reintentarNube} type="button" style={{ ...btnMini, color: C.amber, borderColor: C.amber + '66', background: 'none', whiteSpace: 'nowrap' }}>Reintentar ahora</button>
+              </div>
+            )}
             <div style={{ fontFamily: 'Inter', fontSize: 10.5, color: C.muted, marginTop: 2 }}>Aviso automático 7 días antes del vencimiento al admin y al trabajador.</div>
           </div>
         )}
