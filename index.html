@@ -949,6 +949,7 @@ n      }
     const DOCS_BORRADOS_KEY = 'grifos_kala_docs_borrados';
     let nubePendienteDocs = false;
     let avisoNubeDocsMostrado = false;
+    let reintentosNubeDocs = 0;
 
     function leerDocsLocal() {
       try { return JSON.parse(localStorage.getItem(DOCS_LS_KEY)) || []; } catch { return []; }
@@ -1068,7 +1069,12 @@ n      }
     }
     // Sube lo pendiente, borra lo eliminado y baja los documentos de la nube
     function refrescarDocsDesdeNube() {
-      if (!supabase || nubePendienteDocs) return Promise.resolve();
+      // Si la librería de Supabase aún no cargó al abrir la página, reintenta en un momento
+      if (!esClienteSupabase(supabase) && !initSupabaseCliente()) {
+        if (reintentosNubeDocs++ < 10) setTimeout(refrescarDocsDesdeNube, 2000);
+        return Promise.resolve();
+      }
+      if (nubePendienteDocs) return Promise.resolve();
       const borrados = leerBorradosDoc();
       if (borrados.length) {
         supabase.from('documentos_vehiculo').delete().in('id', borrados)
