@@ -1082,7 +1082,9 @@ n      }
           const locales = leerDocsLocal();
           const omitir = new Set(leerBorradosDoc());
           const idsNube = new Set(data.map(r => String(r.id)));
-          const soloLocal = locales.filter(d => !idsNube.has(String(d.id)) && !omitir.has(String(d.id)));
+          // Solo se conservan los documentos que nunca llegaron a la nube;
+          // si uno ya estaba sincronizado y desapareció de la nube, lo eliminaron en otro equipo.
+          const soloLocal = locales.filter(d => !idsNube.has(String(d.id)) && !omitir.has(String(d.id)) && !d.sinc);
           const copiaLocal = new Map(locales.map(d => [String(d.id), d]));
           const nube = data
             .filter(r => !omitir.has(String(r.id)))
