@@ -53,7 +53,7 @@ Diseñado para gestionar ventas de combustible, empleados, máquinas, facturaci�
 | Gasolina Regular | gal | S/ 19.90 |
 | Urea 32 | litros | S/ 2.50 |
 
-- Tablas de calibración matemáticas para tanques cilíndricos
+- Tablas oficiales de cubicación de cada tanque (cm de varilla → galones)
 - Cálculo de capacidad por nivel de cm
 
 ### 4. 📄 Facturación Electrónica
