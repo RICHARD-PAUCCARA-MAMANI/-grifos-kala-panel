@@ -616,7 +616,12 @@ n      }
       }
     }
 
+    // La página solo emite comprobantes internos: no se envía nada a SUNAT.
+    // Se deja el código listo; basta poner true cuando haya RUC electrónico y credenciales propias.
+    const EMISION_ELECTRONICA_AUTO = false;
+
     async function emitirComprobanteElectronico(venta) {
+      if (!EMISION_ELECTRONICA_AUTO) return { ok: false, omitido: true };
       const esFactura = venta.comp === 'Factura';
       const cliente = venta.cliente || {};
       const tipoDoc = esFactura ? '6' : '1';
@@ -1817,11 +1822,13 @@ n      }
         const now = new Date();
         const nuevaVenta = { fecha: formatFechaCorta(new Date()), hora: now.toTimeString().slice(0, 5), producto: itemPrincipal.producto, cant: itemPrincipal.cant, precioUnitario: itemPrincipal.precioUnitario, total: totalFinal, subtotal: dg.subtotal, igv: dg.igv, metodo: METODOS.find(m => m.id === metodoPago)?.label || 'Transferencia', comp: tipoComp === 'factura' ? 'Factura' : 'Boleta', serieBoleta: generarNumeroComprobante('boleta', ventas), serieFactura: tipoComp === 'factura' ? generarNumeroComprobante('factura', ventas) : null, ruc: tipoComp === 'factura' ? ruc : null, razonSocial: tipoComp === 'factura' ? razonSocial : null, dniCliente: tipoComp === 'boleta' && dniCliente ? dniCliente : null, nombreCliente: tipoComp === 'boleta' && nombreCliente ? nombreCliente : null, placa: placa || null, direccion: tipoComp === 'factura' ? (direccionCliente || null) : null, items: itemsVenta, itemCount: itemsVenta.length, esBancarizacion: true, trabajador: 'Admin' };
         setVentas(prev => [nuevaVenta, ...prev]); setGuardado(true); setTimeout(() => setGuardado(false), 2500);
-        const ventaParaApi = { ...nuevaVenta, cliente: { nombre: nombreCliente || razonSocial || 'CLIENTE VARIOS', ruc: tipoComp === 'factura' ? ruc : null, dni: tipoComp !== 'factura' ? dniCliente : null, direccion: tipoComp === 'factura' ? (direccionCliente || null) : null }, items: itemsVenta.map(it => ({ nombre: it.producto, precioUnitario: it.precioUnitario, total: it.total, unidad: it.unidad === 'litros' ? 'litros' : 'gal' })) };
-        emitirComprobanteElectronico(ventaParaApi).then(res => {
-          if (res.ok) console.log('📄 Comprobante enviado a SUNAT:', res.data);
-          else console.warn('⚠️ No se pudo emitir electrónicamente:', res.error);
-        });
+        if (EMISION_ELECTRONICA_AUTO) {
+          const ventaParaApi = { ...nuevaVenta, cliente: { nombre: nombreCliente || razonSocial || 'CLIENTE VARIOS', ruc: tipoComp === 'factura' ? ruc : null, dni: tipoComp !== 'factura' ? dniCliente : null, direccion: tipoComp === 'factura' ? (direccionCliente || null) : null }, items: itemsVenta.map(it => ({ nombre: it.producto, precioUnitario: it.precioUnitario, total: it.total, unidad: it.unidad === 'litros' ? 'litros' : 'gal' })) };
+          emitirComprobanteElectronico(ventaParaApi).then(res => {
+            if (res.ok) console.log('📄 Comprobante enviado a SUNAT:', res.data);
+            else console.warn('⚠️ No se pudo emitir electrónicamente:', res.error);
+          });
+        }
         setRuc(''); setRazonSocial(''); setDniCliente(''); setNombreCliente(''); setPlaca(''); setDireccionCliente(''); setItemsCarrito([]); setValor('');
       }
 
@@ -3393,8 +3400,7 @@ n      }
         const hora = now.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
         const esFactura = ventaRegistrada.comp === 'Factura';
         const esCotizacion = ventaRegistrada.comp === 'Cotización';
-        const sub = (ventaRegistrada.total / 1.18);
-        const igv = (ventaRegistrada.total - sub);
+        const dg = desgloseIGV(ventaRegistrada.total);
 
         // Scale factor por ancho de papel (PAPELES_IMPRESION.escala): 48=0.89, 58=1, 72=1.16, 80=1.25, A4=2.2
         const s = papel.escala;
@@ -3450,9 +3456,12 @@ n      }
   .son b { font-weight: 700; color: #111; }
   .gracias { font-family: ${fontSerif}; font-style: italic; font-size: ${11.5 * s}px; font-weight: 600; letter-spacing: ${0.6 * s}px; color: #111; }
   .cut { border-top: ${0.8 * s}px dashed #b9b2a4; margin-top: ${3 * s}mm; padding-top: ${1.5 * s}mm; text-align: center; font-size: ${6.5 * s}px; letter-spacing: ${1.2 * s}px; color: #9a9a9a; }
+  /* Marca de agua muy tenue sobre el comprobante; no se pinta si falta la imagen */
+  .agua { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; pointer-events: none; opacity: 0.03; background-image: url('/marca-agua.png'); background-repeat: repeat; background-size: ${30 * s}mm auto; }
   @media screen { html { zoom: ${zPrev}; overflow: hidden; } body { overflow: hidden; } }
   @media print { html { zoom: 1; } body { padding: ${padBody}; width: ${bodyWidth}; margin: 0 auto; } }
 </style></head><body>
+<div class='agua' aria-hidden='true'></div>
 
 <!-- 1 · EMPRESA -->
 <div class='c'>
@@ -3492,11 +3501,11 @@ n      }
   <tbody>${itemsHtml}</tbody>
 </table>
 
-<!-- 6 · TOTALES -->
-${esFactura ? `<div style='margin-top:${2 * s}mm'>
-  <div class='tot'><span>Op. gravada</span><span>S/ ${sub.toFixed(2)}</span></div>
-  <div class='tot'><span>IGV 18%</span><span>S/ ${igv.toFixed(2)}</span></div>
-</div>` : ''}
+<!-- 6 · TOTALES — el desglose del IGV va en todos los comprobantes -->
+<div style='margin-top:${2 * s}mm'>
+  <div class='tot'><span>Op. gravada</span><span>S/ ${dg.subtotal.toFixed(2)}</span></div>
+  <div class='tot'><span>IGV ${Math.round(IGV_TASA * 100)}%</span><span>S/ ${dg.igv.toFixed(2)}</span></div>
+</div>
 <div class='tot-box'>
   <span class='tot-l'>Total</span>
   <span class='tot-v'>S/ ${ventaRegistrada.total.toFixed(2)}</span>
