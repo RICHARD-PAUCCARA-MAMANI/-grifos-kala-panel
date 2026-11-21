@@ -97,6 +97,18 @@
     button { font: inherit; }
     img { max-width: 100%; height: auto; }
     
+    /* ===== MARCA DE AGUA (imagen /marca-agua.png) ===== */
+    .marca-agua {
+      position: fixed; inset: 0;
+      z-index: 2000;
+      pointer-events: none;
+      background-image: url('/marca-agua.png');
+      background-repeat: repeat;
+      background-size: 190px auto;
+      opacity: 0.06;
+    }
+    @media print { .marca-agua { display: none !important; } }
+
     /* ===== SCROLLBAR ===== */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-thumb { background: #343E46; border-radius: 3px; }
@@ -4854,9 +4866,17 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
 
     /* ===================== RENDER ===================== */
     window.onerror = function(msg, src, line, col, err) { document.getElementById('root').innerHTML = '<div style="padding:20px;color:#f44;font-family:monospace;background:#1a1a1a;min-height:100vh"><h2>❌ Error</h2><pre style="white-space:pre-wrap;margin-top:10px;font-size:13px">' + msg + '\nLine: ' + line + ':' + col + '\n' + (err && err.stack ? err.stack : '') + '</pre></div>'; };
+    function MarcaAgua() {
+      // Marca de agua sutil sobre toda la página. Si /marca-agua.png no existe,
+      // no se ve nada (un background 404 no pinta nada, no rompe la vista).
+      return <div className="marca-agua" aria-hidden="true" />;
+    }
     function AppWrapper() {
       const [themeDark, setThemeDark] = useState(true);
-      return <App themeDark={themeDark} setThemeDark={setThemeDark} />;
+      return <>
+        <App themeDark={themeDark} setThemeDark={setThemeDark} />
+        <MarcaAgua />
+      </>;
     }
     ReactDOM.createRoot(document.getElementById('root')).render(<AppWrapper />);
   </script>
