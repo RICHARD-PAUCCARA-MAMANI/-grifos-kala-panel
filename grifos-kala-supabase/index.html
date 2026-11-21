@@ -868,6 +868,20 @@ n      }
       diesel3: TABLA_REGULAR,
       diesel4: TABLA_D2_4,
     };
+    const NOMBRE_TANQUE = { diesel1: 'D2#1', regular: 'Regular', diesel3: 'D2#3', diesel4: 'D2#4' };
+    /* Qué tanques se miden con cada producto del varillado (Urea va en litros, es lineal, no usa tabla) */
+    const TANQUES_POR_PRODUCTO = { diesel: ['diesel1'], diesel4: ['diesel3', 'diesel4'], regular: ['regular'] };
+    /* Galones equivalentes a una lectura de varilla, para mostrarlos donde se ingresa el cm */
+    function galonesDeVarilla(productoId, cm) {
+      const ids = TANQUES_POR_PRODUCTO[productoId] || [];
+      const n = parseFloat(cm);
+      if (ids.length === 0 || !(n >= 0)) return [];
+      return ids.map(id => {
+        const tabla = TABLAS_PRE[id];
+        const vacio = tabla[tabla.length - 1];
+        return { tanque: NOMBRE_TANQUE[id], galones: interpolarTabla(Math.min(n, tabla.length - 1), tabla), capacidad: vacio };
+      });
+    }
 
     /* ===================== HELPERS ===================== */
     function money(n) { return 'S/ ' + n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -1613,6 +1627,9 @@ n      }
       }
       function ajustarNivelCm(id, nuevoCm) { setTanques(prev => ({ ...prev, [id]: { ...prev[id], nivelCm: Math.max(0, Math.min(Number(nuevoCm) || 0, prev[id].alturaTotalCm)) } })); }
 
+      // Consulta de la tabla de cubicación por cm de varilla
+      const [consultaCm, setConsultaCm] = useState('');
+
       return (<div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {Object.entries(tanques).some(([, t]) => (t.nivelCm / t.alturaTotalCm) <= 0.2) && (
           <div style={{ background: C.redSoft, border: `1px solid ${C.red}44`, borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1660,6 +1677,35 @@ n      }
               </div>
             </div>);
           })}
+        </div>
+        {/* ===== CONSULTA DE CUBICACIÓN POR CM ===== */}
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: 700, color: C.text }}>🔎 Consulta de cubicación por cm</div>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginTop: 2 }}>Escribe la lectura de la varilla y mira los galones de todos los tanques.</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input type="number" min="0" placeholder="cm" value={consultaCm} onChange={e => setConsultaCm(e.target.value)} style={{ width: 110, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, textAlign: 'center', boxSizing: 'border-box' }} />
+              <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted }}>cm</span>
+            </div>
+          </div>
+          {consultaCm === '' ? (
+            <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted }}>Sin lectura: escribe un valor en cm para ver la equivalencia.</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8 }}>
+              {Object.entries(tanques).map(([id, t]) => {
+                const cm = Math.min(Math.max(0, parseFloat(consultaCm) || 0), t.alturaTotalCm);
+                const gal = cmAGalones(cm, id);
+                const pct = t.alturaTotalCm ? (cm / t.alturaTotalCm) * 100 : 0;
+                return (<div key={id} style={{ background: C.bg, borderRadius: 8, padding: '10px 12px', border: `1px solid ${C.border}` }}>
+                  <div style={{ fontFamily: 'Inter', fontSize: 11, fontWeight: 600, color: t.color }}>{t.nombre}</div>
+                  <div style={{ fontFamily: 'JetBrains Mono', fontSize: 17, fontWeight: 700, color: C.text, marginTop: 2 }}>{gal.toLocaleString()} <span style={{ fontSize: 10, color: C.muted }}>{t.unidad}</span></div>
+                  <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.muted, marginTop: 2 }}>{pct.toFixed(1)}% · {cm} de {t.alturaTotalCm} cm</div>
+                </div>);
+              })}
+            </div>
+          )}
         </div>
         {/* ===== HISTORIAL DE VARILLADO ===== */}
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
@@ -4512,7 +4558,14 @@ ${gastosRows ? `<div class='sep'></div><div class='section'>💰 Gastos del Turn
                   <span style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, minWidth: 18 }}>cm</span>
                   <div style={{ flex: 1 }} />
                   {varillado[p.id] && (
-                    <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, fontWeight: 600, color: C.amber }}>{parseFloat(varillado[p.id]).toLocaleString()} cm</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <span style={{ fontFamily: 'JetBrains Mono', fontSize: 12, fontWeight: 600, color: C.amber }}>{parseFloat(varillado[p.id]).toLocaleString()} cm</span>
+                      {galonesDeVarilla(p.id, varillado[p.id]).map(g => (
+                        <span key={g.tanque} title={`Capacidad ${g.capacidad.toLocaleString()} gal`} style={{ fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, color: C.teal, background: C.tealSoft, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                          {g.tanque}: {g.galones.toLocaleString(undefined, { maximumFractionDigits: 1 })} gal
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
               ))}
