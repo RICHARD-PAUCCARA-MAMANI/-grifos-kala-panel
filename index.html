@@ -615,8 +615,11 @@ n      }
       const fecha = now.toISOString().split('T')[0];
       const hora = now.toTimeString().slice(0, 8);
 
-      const subtotal = venta.total / 1.18;
-      const igv = venta.total - subtotal;
+      const { subtotal, igv } = desgloseIGV(venta.total);
+      const serieComprobante = (esFactura ? venta.serieFactura : venta.serieBoleta) || (esFactura ? 'F001' : 'B001');
+      const correlativoComprobante = String(serieComprobante).indexOf('-') >= 0
+        ? String(serieComprobante).split('-').pop().padStart(5, '0')
+        : '00001';
 
       const productos = (venta.items || []).map((item, idx) => ({
         unidades: 1,
@@ -647,8 +650,8 @@ n      }
 
       const body = {
         tipoOperacion: '010',
-        serie: esFactura ? 'F001' : 'B001',
-        correlativo: venta.serie ? venta.serie.split('-')[1] : String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0'),
+        serie: serieComprobante,
+        correlativo: correlativoComprobante,
         fechaEmision: fecha,
         horaEmision: hora,
         fechaVencimiento: fecha,
@@ -1262,7 +1265,34 @@ n      }
     function formatFechaLarga(d) { const s = d.toLocaleDateString('es-PE', { weekday: 'long', day: '2-digit', month: 'long' }); return s.charAt(0).toUpperCase() + s.slice(1); }
     function addDias(d, n) { const nd = new Date(d); nd.setDate(nd.getDate() + n); return nd; }
     function numeroALetras(n) { return 'SON ' + money(n).replace('S/ ', '') + ' SOLES'; }
-    function generarNumeroComprobante(tipo) { const p = tipo === 'factura' ? 'F001' : 'B001'; return p + '-' + String(Math.floor(Math.random()*99999)+1).padStart(5,'0'); }
+    const IGV_TASA = 0.18;
+    // Los precios del grifo ya incluyen IGV: separa la base imponible del impuesto
+    function desgloseIGV(total) {
+      const t = Math.max(0, Number(total) || 0);
+      const subtotal = Math.round((t / (1 + IGV_TASA)) * 100) / 100;
+      return { subtotal, igv: Math.round((t - subtotal) * 100) / 100, total: Math.round(t * 100) / 100 };
+    }
+    // IGV de un comprobante ya emitido: usa lo guardado si cuadra con el total
+    function igvDeVenta(v) {
+      const total = Number(v && v.total) || 0;
+      const sub = Number(v && v.subtotal);
+      const igv = Number(v && v.igv);
+      const guardado = v && v.subtotal !== null && v.subtotal !== undefined && v.igv !== null && v.igv !== undefined;
+      if (guardado && isFinite(sub) && isFinite(igv) && Math.abs(sub + igv - total) < 0.02) return { subtotal: sub, igv, total };
+      return desgloseIGV(total);
+    }
+    // Correlativo por serie: B001-00001, B001-00002, F001-00001...
+    function generarNumeroComprobante(tipo, ventas) {
+      const prefijo = tipo === 'factura' ? 'F001' : 'B001';
+      const campo = tipo === 'factura' ? 'serieFactura' : 'serieBoleta';
+      const ultimo = (Array.isArray(ventas) ? ventas : []).reduce((max, v) => {
+        const serie = v && v[campo] ? String(v[campo]) : '';
+        if (serie.indexOf(prefijo + '-') !== 0) return max;
+        const n = parseInt(serie.slice(prefijo.length + 1), 10);
+        return isFinite(n) ? Math.max(max, n) : max;
+      }, 0);
+      return prefijo + '-' + String(ultimo + 1).padStart(5, '0');
+    }
 
     function getInputStyle() { return { width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', color: C.text, fontFamily: 'Inter', fontSize: 13.5, boxSizing: 'border-box' }; }
 
@@ -1593,8 +1623,7 @@ n      }
           <span style={{ fontSize: 9.5, fontWeight: 500, color: '#111', wordBreak: 'break-word' }}>{val}</span>
         </div>
       );
-      const sub = v.total / 1.18;
-      const igv = v.total - sub;
+      const { subtotal: sub, igv, total: tot } = igvDeVenta(v);
       return (
         <div style={{ background: '#fff', borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: '18px 18px 16px', fontFamily: "'Inter', system-ui, sans-serif", color: '#111', fontFeatureSettings: "'tnum' 1, 'lnum' 1", lineHeight: 1.45 }}>
 
@@ -1644,27 +1673,25 @@ n      }
               {(v.items || []).map((item, idx) => (
                 <tr key={idx}>
                   <td style={{ ...tdStyle, textAlign: 'right', paddingRight: 2 }}>{(parseFloat(item.cant) || 0).toFixed(2)}</td>
-                  <td style={{ ...tdStyle, textAlign: 'left', color: '#6b6b6b', paddingLeft: 6 }}>{item.unidad === 'gal' ? 'GLL' : item.unidad === 'litros' ? 'LTR' : 'UNI'}</td>
+                  <td style={{ ...tdStyle, textAlign: 'left', color: '#6b6b6b', paddingLeft: 6 }}>{item.unidad === 'litros' ? 'LTR' : (item.unidad === 'gal' || (!item.unidad && /gal/i.test(String(item.cant)))) ? 'GLL' : 'UNI'}</td>
                   <td style={{ ...tdStyle, textTransform: 'uppercase', fontWeight: 600 }}>{item.producto || ''}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>{(item.precioUnitario || 0).toFixed(2)}</td>
-                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{item.total.toFixed(2)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>{(Number(item.total) || 0).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          {/* 6 · Totales */}
-          {esFactura && (
-            <div style={{ marginTop: 9 }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, fontSize: 8.6, color: '#555', marginBottom: 3 }}><span>Op. gravada</span><span style={{ width: 58, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{sub.toFixed(2)}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, fontSize: 8.6, color: '#555' }}><span>IGV 18%</span><span style={{ width: 58, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{igv.toFixed(2)}</span></div>
-            </div>
-          )}
+          {/* 6 · Totales — el desglose del IGV va en boletas y facturas */}
+          <div style={{ marginTop: 9 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, fontSize: 8.6, color: '#555', marginBottom: 3 }}><span>Op. gravada</span><span style={{ width: 58, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{sub.toFixed(2)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, fontSize: 8.6, color: '#555' }}><span>IGV ({Math.round(IGV_TASA * 100)}%)</span><span style={{ width: 58, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{igv.toFixed(2)}</span></div>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1.5px solid #111', borderBottom: '1.5px solid #111', padding: '8px 0', marginTop: 7 }}>
             <span style={{ fontFamily: serif, fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase' }}>Total a pagar</span>
-            <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: 0.3, fontVariantNumeric: 'tabular-nums' }}>S/ {v.total.toFixed(2)}</span>
+            <span style={{ fontSize: 14, fontWeight: 800, letterSpacing: 0.3, fontVariantNumeric: 'tabular-nums' }}>S/ {tot.toFixed(2)}</span>
           </div>
-          <div style={{ fontSize: 8, color: '#555', margin: '9px 0 11px', lineHeight: 1.5 }}>{numeroALetras(v.total)}</div>
+          <div style={{ fontSize: 8, color: '#555', margin: '9px 0 11px', lineHeight: 1.5 }}>{numeroALetras(tot)}</div>
 
           {/* 7 · Forma de pago */}
           <div style={{ borderTop: '1px dashed #ded7cb', paddingTop: 9 }}>
@@ -1694,6 +1721,7 @@ n      }
       const [ruc, setRuc] = useState(''); const [razonSocial, setRazonSocial] = useState('');
       const [dniCliente, setDniCliente] = useState(''); const [nombreCliente, setNombreCliente] = useState('');
       const [placa, setPlaca] = useState('');
+      const [direccionCliente, setDireccionCliente] = useState('');
       const [metodoPago, setMetodoPago] = useState('transferencia');
       const [cargandoCliente, setCargandoCliente] = useState(false);
 
@@ -1732,14 +1760,18 @@ n      }
 
       function abrirEditar(v) {
         setShowEditar(v);
-        setEditDatos({ comp: v.comp || 'Boleta', serieBoleta: v.serieBoleta || '', serieFactura: v.serieFactura || '', total: v.total || 0, metodo: v.metodo || 'Efectivo', nombreCliente: v.nombreCliente || '', dniCliente: v.dniCliente || '', razonSocial: v.razonSocial || '', ruc: v.ruc || '', placa: v.placa || '', fecha: v.fecha || '', hora: v.hora || '' });
+        setEditDatos({ comp: v.comp || 'Boleta', serieBoleta: v.serieBoleta || '', serieFactura: v.serieFactura || '', total: v.total || 0, metodo: v.metodo || 'Efectivo', nombreCliente: v.nombreCliente || '', dniCliente: v.dniCliente || '', razonSocial: v.razonSocial || '', ruc: v.ruc || '', direccion: v.direccion || '', placa: v.placa || '', fecha: v.fecha || '', hora: v.hora || '' });
       }
       function guardarEdicion() {
         if (!showEditar || !editDatos) return;
         const totalNum = parseFloat(editDatos.total) || 0;
+        const dg = desgloseIGV(totalNum);
         const esFact = editDatos.comp === 'Factura';
         const esBol = editDatos.comp === 'Boleta';
-        setVentas(prev => prev.map(x => x === showEditar ? { ...x, comp: editDatos.comp, serieBoleta: esFact ? null : (editDatos.serieBoleta || null), serieFactura: esFact ? (editDatos.serieFactura || null) : null, ruc: esFact ? (editDatos.ruc || null) : null, razonSocial: esFact ? (editDatos.razonSocial || null) : null, dniCliente: esBol ? (editDatos.dniCliente || null) : null, nombreCliente: esBol ? (editDatos.nombreCliente || null) : null, placa: editDatos.placa || null, total: totalNum, metodo: editDatos.metodo, fecha: editDatos.fecha, hora: editDatos.hora } : x));
+        // Al cambiar de tipo sin serie, se asigna el siguiente correlativo
+        const serieB = esFact ? null : (editDatos.serieBoleta || generarNumeroComprobante('boleta', ventas));
+        const serieF = esFact ? (editDatos.serieFactura || generarNumeroComprobante('factura', ventas)) : null;
+        setVentas(prev => prev.map(x => x === showEditar ? { ...x, comp: editDatos.comp, serieBoleta: serieB, serieFactura: serieF, ruc: esFact ? (editDatos.ruc || null) : null, razonSocial: esFact ? (editDatos.razonSocial || null) : null, dniCliente: esBol ? (editDatos.dniCliente || null) : null, nombreCliente: esBol ? (editDatos.nombreCliente || null) : null, placa: editDatos.placa || null, total: totalNum, subtotal: dg.subtotal, igv: dg.igv, direccion: esFact ? (editDatos.direccion || null) : null, metodo: editDatos.metodo, fecha: editDatos.fecha, hora: editDatos.hora } : x));
         setShowEditar(null); setEditDatos(null);
       }
       function anularComprobante(v) {
@@ -1764,23 +1796,28 @@ n      }
       function crearComprobante() {
         const p = productos.find(pp => pp.id === productoId); const num = parseFloat(valor) || 0;
         let itemsVenta = [];
-        if (itemsCarrito.length > 0) { itemsVenta = itemsCarrito.map(item => ({ producto: item.producto.nombre, cant: `${item.galones.toFixed(2)} ${item.producto.unidad}`, precioUnitario: item.producto.precio, total: item.soles })); }
-        else if (num > 0) { const galones = modo === 'galones' ? num : num / p.precio; const soles = modo === 'soles' ? num : num * p.precio; itemsVenta = [{ producto: p.nombre, cant: `${galones.toFixed(2)} ${p.unidad}`, precioUnitario: p.precio, total: soles }]; }
+        if (itemsCarrito.length > 0) { itemsVenta = itemsCarrito.map(item => ({ producto: item.producto.nombre, cant: `${item.galones.toFixed(2)} ${item.producto.unidad}`, unidad: item.producto.unidad, precioUnitario: item.producto.precio, total: item.soles })); }
+        else if (num > 0) { const galones = modo === 'galones' ? num : num / p.precio; const soles = modo === 'soles' ? num : num * p.precio; itemsVenta = [{ producto: p.nombre, cant: `${galones.toFixed(2)} ${p.unidad}`, unidad: p.unidad, precioUnitario: p.precio, total: soles }]; }
         if (itemsVenta.length === 0) return;
         const totalFinal = itemsVenta.reduce((a, it) => a + it.total, 0);
+        const dg = desgloseIGV(totalFinal);
         const itemPrincipal = itemsVenta.reduce((a, b) => a.total > b.total ? a : b);
         const now = new Date();
-        const nuevaVenta = { fecha: formatFechaCorta(new Date()), hora: now.toTimeString().slice(0, 5), producto: itemPrincipal.producto, cant: itemPrincipal.cant, precioUnitario: itemPrincipal.precioUnitario, total: totalFinal, metodo: METODOS.find(m => m.id === metodoPago)?.label || 'Transferencia', comp: tipoComp === 'factura' ? 'Factura' : 'Boleta', serieBoleta: generarNumeroComprobante('boleta'), serieFactura: tipoComp === 'factura' ? generarNumeroComprobante('factura') : null, ruc: tipoComp === 'factura' ? ruc : null, razonSocial: tipoComp === 'factura' ? razonSocial : null, dniCliente: tipoComp === 'boleta' && dniCliente ? dniCliente : null, nombreCliente: tipoComp === 'boleta' && nombreCliente ? nombreCliente : null, placa: placa || null, items: itemsVenta, itemCount: itemsVenta.length, esBancarizacion: true, trabajador: 'Admin' };
+        const nuevaVenta = { fecha: formatFechaCorta(new Date()), hora: now.toTimeString().slice(0, 5), producto: itemPrincipal.producto, cant: itemPrincipal.cant, precioUnitario: itemPrincipal.precioUnitario, total: totalFinal, subtotal: dg.subtotal, igv: dg.igv, metodo: METODOS.find(m => m.id === metodoPago)?.label || 'Transferencia', comp: tipoComp === 'factura' ? 'Factura' : 'Boleta', serieBoleta: generarNumeroComprobante('boleta', ventas), serieFactura: tipoComp === 'factura' ? generarNumeroComprobante('factura', ventas) : null, ruc: tipoComp === 'factura' ? ruc : null, razonSocial: tipoComp === 'factura' ? razonSocial : null, dniCliente: tipoComp === 'boleta' && dniCliente ? dniCliente : null, nombreCliente: tipoComp === 'boleta' && nombreCliente ? nombreCliente : null, placa: placa || null, direccion: tipoComp === 'factura' ? (direccionCliente || null) : null, items: itemsVenta, itemCount: itemsVenta.length, esBancarizacion: true, trabajador: 'Admin' };
         setVentas(prev => [nuevaVenta, ...prev]); setGuardado(true); setTimeout(() => setGuardado(false), 2500);
-        const ventaParaApi = { ...nuevaVenta, cliente: { nombre: nombreCliente || razonSocial || 'CLIENTE VARIOS', ruc: tipoComp === 'factura' ? ruc : null, dni: tipoComp !== 'factura' ? dniCliente : null, direccion: null }, items: itemsVenta.map(it => ({ nombre: it.producto, precioUnitario: it.precioUnitario, total: it.total, unidad: it.cant.includes('gal') ? 'gal' : it.cant.includes('litros') ? 'litros' : 'kg' })) };
+        const ventaParaApi = { ...nuevaVenta, cliente: { nombre: nombreCliente || razonSocial || 'CLIENTE VARIOS', ruc: tipoComp === 'factura' ? ruc : null, dni: tipoComp !== 'factura' ? dniCliente : null, direccion: tipoComp === 'factura' ? (direccionCliente || null) : null }, items: itemsVenta.map(it => ({ nombre: it.producto, precioUnitario: it.precioUnitario, total: it.total, unidad: it.unidad === 'litros' ? 'litros' : 'gal' })) };
         emitirComprobanteElectronico(ventaParaApi).then(res => {
           if (res.ok) console.log('📄 Comprobante enviado a SUNAT:', res.data);
           else console.warn('⚠️ No se pudo emitir electrónicamente:', res.error);
         });
-        setRuc(''); setRazonSocial(''); setDniCliente(''); setNombreCliente(''); setPlaca(''); setItemsCarrito([]); setValor('');
+        setRuc(''); setRazonSocial(''); setDniCliente(''); setNombreCliente(''); setPlaca(''); setDireccionCliente(''); setItemsCarrito([]); setValor('');
       }
 
       const productoActual = productos.find(p => p.id === productoId); const numActual = parseFloat(valor) || 0;
+      const totalEstimado = itemsCarrito.length > 0
+        ? itemsCarrito.reduce((a, it) => a + it.soles, 0)
+        : (numActual > 0 && productoActual ? (modo === 'soles' ? numActual : numActual * productoActual.precio) : 0);
+      const dgEstimado = desgloseIGV(totalEstimado);
       const trabajadoresUnicos = [...new Set(ventas.map(v => v.trabajador).filter(Boolean))];
       const ventasConComprobante = ventas.filter(v => filtro === 'todos' ? true : filtro === 'boletas' ? v.comp === 'Boleta' : filtro === 'facturas' ? v.comp === 'Factura' : true).filter(v => filtroTrabajador === 'todos' ? true : v.trabajador === filtroTrabajador).filter(v => !busqueda ? true : (v.producto || '').toLowerCase().includes(busqueda.toLowerCase()) || (v.serieBoleta || '').toLowerCase().includes(busqueda.toLowerCase()) || (v.serieFactura || '').toLowerCase().includes(busqueda.toLowerCase()) || (v.trabajador || '').toLowerCase().includes(busqueda.toLowerCase()));
       const totalBoletas = ventas.filter(v => v.comp === 'Boleta' && !v.anulada).length;
@@ -1840,7 +1877,10 @@ n      }
                   {v.trabajador && <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.teal, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><I.User size={10} color={C.teal} /> {v.trabajador}{v.esBancarizacion && <span style={{ fontSize: 9, color: C.green, marginLeft: 4 }}>(Bancarización)</span>}</div>}
                 </div>
                 <div style={{ textAlign: 'right', minWidth: 80 }}><div style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: C.textDim }}>{v.fecha}</div><div style={{ fontFamily: 'JetBrains Mono', fontSize: 11, color: C.muted }}>{v.hora}</div></div>
-                <div style={{ textAlign: 'right', minWidth: 80 }}><div style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: C.amber }}>{money(v.total)}</div></div>
+                <div style={{ textAlign: 'right', minWidth: 92 }}>
+                  <div style={{ fontFamily: 'JetBrains Mono', fontSize: 15, fontWeight: 700, color: C.amber }}>{money(v.total)}</div>
+                  <div style={{ fontFamily: 'JetBrains Mono', fontSize: 10, color: C.muted, marginTop: 2 }}>IGV {money(igvDeVenta(v).igv)}</div>
+                </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   <button onClick={() => setShowPreview(v)} title="Ver comprobante" type="button" style={{ display: 'flex', alignItems: 'center', gap: 5, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 10px', color: C.textDim, cursor: 'pointer', fontFamily: 'Inter', fontSize: 11.5 }}><I.Eye size={13} /> Ver</button>
                   <button onClick={() => abrirEditar(v)} title="Modificar comprobante" type="button" style={{ display: 'flex', alignItems: 'center', background: C.bg, border: `1px solid ${C.teal}55`, borderRadius: 7, padding: '6px 8px', color: C.teal, cursor: 'pointer' }}><I.Pencil size={13} /></button>
@@ -1867,6 +1907,7 @@ n      }
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Tipo de comprobante</div>
               <div style={{ display: 'flex', gap: 8 }}>{[{ id: 'boleta', label: 'Boleta de Venta', color: C.teal }, { id: 'factura', label: 'Factura', color: C.green }].map(t => (<button key={t.id} onClick={() => setTipoComp(t.id)} type="button" style={{ flex: 1, padding: '10px 12px', borderRadius: 8, cursor: 'pointer', border: `1.5px solid ${tipoComp === t.id ? t.color : C.border}`, background: tipoComp === t.id ? `${t.color}22` : C.bg, color: tipoComp === t.id ? t.color : C.textDim, fontFamily: 'Inter', fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>{t.label}</button>))}</div></div>
             {tipoComp === 'factura' ? (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase' }}>RUC</div><div style={{ position: 'relative' }}><input placeholder="RUC (11 dígitos)" value={ruc} onChange={e => setRuc(e.target.value)} maxLength={11} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono', paddingRight: cargandoCliente ? 36 : 12 }} />{cargandoCliente && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.amber, fontSize: 12 }}>⏳</div>}</div>{razonSocial && <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.green, padding: '6px 10px', background: C.greenSoft, borderRadius: 6, border: `1px solid ${C.green}33` }}>✅ {razonSocial}</div>}</div>) : (<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase' }}>DNI</div><div style={{ position: 'relative' }}><input placeholder="DNI (8 dígitos)" value={dniCliente} onChange={e => setDniCliente(e.target.value)} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono', paddingRight: cargandoCliente ? 36 : 12 }} />{cargandoCliente && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.amber, fontSize: 12 }}>⏳</div>}</div>{nombreCliente && <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.green, padding: '6px 10px', background: C.greenSoft, borderRadius: 6, border: `1px solid ${C.green}33` }}>✅ {nombreCliente}</div>}</div>)}
+            {tipoComp === 'factura' && (<div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Dirección fiscal (opcional)</div><input placeholder="Av. / Calle, distrito, provincia" value={direccionCliente} onChange={e => setDireccionCliente(e.target.value)} style={{ ...getInputStyle(), fontSize: 12.5 }} /></div>)}
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Placa (opcional)</div><input placeholder="ABC-123" value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono', letterSpacing: 1 }} /></div>
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Producto</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>{productos.map(p => { const sel = p.id === productoId; return (<button key={p.id} onClick={() => setProductoId(p.id)} type="button" style={{ padding: '10px 8px', borderRadius: 8, cursor: 'pointer', textAlign: 'center', border: `1.5px solid ${sel ? p.color : C.border}`, background: sel ? p.soft : C.bg }}><div style={{ fontFamily: 'Inter', fontSize: 12, color: C.text, fontWeight: 500 }}>{p.nombre}</div><div style={{ fontFamily: 'JetBrains Mono', fontSize: 13, color: p.color, fontWeight: 700, marginTop: 2 }}>S/ {p.precio.toFixed(2)}</div></button>); })}</div></div>
@@ -1884,6 +1925,12 @@ n      }
                 <button onClick={() => eliminarItem(idx)} type="button" style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', padding: 2 }}><I.Minus size={12} /></button>
               </div>))}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6, paddingTop: 6, borderTop: `1px solid ${C.border}` }}><span style={{ fontFamily: 'JetBrains Mono', fontSize: 13, color: C.amber, fontWeight: 700 }}>Total: {money(itemsCarrito.reduce((a, it) => a + it.soles, 0))}</span></div>
+            </div>)}
+            {totalEstimado > 0 && (<div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 2 }}>Desglose del comprobante</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'JetBrains Mono', fontSize: 11.5, color: C.textDim }}><span>Op. gravada</span><span>{money(dgEstimado.subtotal)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'JetBrains Mono', fontSize: 11.5, color: C.textDim }}><span>IGV (18%)</span><span>{money(dgEstimado.igv)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'JetBrains Mono', fontSize: 12.5, fontWeight: 700, color: C.text, borderTop: `1px solid ${C.border}`, paddingTop: 4 }}><span>Total a pagar</span><span>{money(dgEstimado.total)}</span></div>
             </div>)}
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Método de pago</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>{METODOS.map(m => { const sel = m.id === metodoPago; return (<button key={m.id} onClick={() => setMetodoPago(m.id)} type="button" style={{ padding: '8px 4px', borderRadius: 8, cursor: 'pointer', textAlign: 'center', border: `1.5px solid ${sel ? C.amber : C.border}`, background: sel ? C.amberSoft : C.bg, color: sel ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 11, fontWeight: 500 }}>{m.label}</button>); })}</div></div>
@@ -1912,6 +1959,7 @@ n      }
             {editDatos.comp === 'Factura' ? (<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>RUC</div><input value={editDatos.ruc} onChange={e => setEditDatos(d => ({ ...d, ruc: e.target.value }))} maxLength={11} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
               <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Razón Social</div><input value={editDatos.razonSocial} onChange={e => setEditDatos(d => ({ ...d, razonSocial: e.target.value }))} style={{ ...getInputStyle() }} /></div>
+              <div style={{ gridColumn: '1 / -1' }}><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Dirección fiscal</div><input value={editDatos.direccion || ''} onChange={e => setEditDatos(d => ({ ...d, direccion: e.target.value }))} style={{ ...getInputStyle(), fontSize: 12.5 }} /></div>
             </div>) : (<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>DNI</div><input value={editDatos.dniCliente} onChange={e => setEditDatos(d => ({ ...d, dniCliente: e.target.value }))} maxLength={8} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
               <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Nombre</div><input value={editDatos.nombreCliente} onChange={e => setEditDatos(d => ({ ...d, nombreCliente: e.target.value }))} style={{ ...getInputStyle() }} /></div>
@@ -1922,7 +1970,11 @@ n      }
               <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Hora</div><input value={editDatos.hora} onChange={e => setEditDatos(d => ({ ...d, hora: e.target.value }))} style={{ ...getInputStyle(), fontFamily: 'JetBrains Mono' }} /></div>
             </div>
             <div style={{ background: C.red + '11', border: `1px solid ${C.red}33`, borderRadius: 8, padding: 10, fontFamily: 'Inter', fontSize: 11.5, color: C.red }}>
-              ⚠️ Al cambiar el tipo de comprobante se ajustan serie y datos del cliente automáticamenteal guardar.
+              ⚠️ Al cambiar el tipo de comprobante se ajustan serie y datos del cliente automáticamente al guardar.
+            </div>
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', display: 'flex', gap: 14, flexWrap: 'wrap', fontFamily: 'JetBrains Mono', fontSize: 11.5, color: C.textDim }}>
+              <span>Op. gravada: <b style={{ color: C.text }}>{money(desgloseIGV(parseFloat(editDatos.total) || 0).subtotal)}</b></span>
+              <span>IGV (18%): <b style={{ color: C.text }}>{money(desgloseIGV(parseFloat(editDatos.total) || 0).igv)}</b></span>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
               <button onClick={() => { setShowEditar(null); setEditDatos(null); }} type="button" style={{ flex: 1, background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 0', fontFamily: 'Inter', fontSize: 13, color: C.textDim, cursor: 'pointer' }}>Cancelar</button>
