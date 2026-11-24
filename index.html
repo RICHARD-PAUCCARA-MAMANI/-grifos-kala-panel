@@ -586,7 +586,7 @@ n      }
           nombre: 'APIsPERU Consultas',
           // Token del servicio "Consulta DNI/RUC" (NO el de facturación: ese no sirve aquí).
           // Se obtiene gratis en apisperu.com/servicios/dniruc (1000 consultas al mes).
-          token: '',
+          token: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6InBhdWNhcmFtYW1hbmk0QGdtYWlsLmNvbSIsImp0aSI6IjczMmY4YmQ3OTdjY2QzYWQifQ.b5tL5XHvtII4dn0v9YPmDhQSacIZSkV16SnW3msg0-Q',
           url: (tipo, numero, token) => `https://dniruc.apisperu.com/api/v1/${tipo}/${numero}?token=${encodeURIComponent(token)}`,
           headers: () => ({ 'Accept': 'application/json' }),
         },
