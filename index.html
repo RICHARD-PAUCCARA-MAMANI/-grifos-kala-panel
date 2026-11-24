@@ -620,6 +620,43 @@ n      }
       };
     }
 
+    // Clientes ya consultados: se guardan en el navegador para reutilizarlos en la
+    // siguiente venta (aparecen al instante y sirven si no hay internet).
+    const CLAVE_CLIENTES_DOC = 'grifos_kala_clientes_doc';
+
+    function leerClientesDoc() {
+      try {
+        const todos = JSON.parse(localStorage.getItem(CLAVE_CLIENTES_DOC) || '{}');
+        return esObjeto(todos) ? todos : {};
+      } catch (e) { return {}; }
+    }
+
+    function esObjeto(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+
+    function leerClienteDoc(doc) {
+      const todos = leerClientesDoc();
+      const dato = todos[String(doc || '')];
+      return esObjeto(dato) ? dato : null;
+    }
+
+    function guardarClienteDoc(doc, datos) {
+      if (!doc || !datos || !datos.nombre) return;
+      try {
+        const todos = leerClientesDoc();
+        todos[String(doc)] = {
+          nombre: datos.nombre,
+          direccion: datos.direccion || '',
+          actualizado: Date.now(),
+        };
+        // Se conservan solo los 200 más recientes para no llenar el almacenamiento.
+        Object.keys(todos)
+          .sort((a, b) => (todos[b].actualizado || 0) - (todos[a].actualizado || 0))
+          .slice(200)
+          .forEach(k => delete todos[k]);
+        localStorage.setItem(CLAVE_CLIENTES_DOC, JSON.stringify(todos));
+      } catch (e) { /* almacenamiento lleno o bloqueado: se ignora */ }
+    }
+
     async function consultarDocumento(tipo, numero) {
       const limpio = String(numero || '').replace(/\D/g, '');
       const digitos = tipo === 'dni' ? 8 : 11;
@@ -649,11 +686,19 @@ n      }
           let json = null;
           try { json = await response.json(); } catch (e) { /* respuesta sin JSON */ }
           const datos = normalizarDocumento(json, tipo);
-          if (response.ok && datos) return Object.assign({ ok: true, proveedor: cfg.nombre }, datos);
+          if (response.ok && datos) {
+            guardarClienteDoc(limpio, datos);
+            return Object.assign({ ok: true, proveedor: cfg.nombre }, datos);
+          }
           ultimoError = (json && (json.message || json.error)) || `Error HTTP ${response.status}`;
         } catch (err) {
           ultimoError = err.message || 'No se pudo conectar';
         }
+      }
+      // Sin proveedor disponible se usa lo guardado de una consulta anterior.
+      const guardado = leerClienteDoc(limpio);
+      if (guardado) {
+        return { ok: true, nombre: guardado.nombre, direccion: guardado.direccion || '', deCache: true, proveedor: 'guardado' };
       }
       return { ok: false, error: ultimoError };
     }
@@ -673,25 +718,30 @@ n      }
       }
       el.style.borderLeftColor = exito ? '#10b981' : '#f59e0b';
       el.textContent = mensaje;
+      el.style.transition = '';
       el.style.display = 'block';
       el.style.opacity = '1';
+      // Se cancelan los cierres pendientes: un aviso anterior podía apagar este.
       clearTimeout(avisarConsulta._t);
+      clearTimeout(avisarConsulta._tOcultar);
       avisarConsulta._t = setTimeout(() => {
         el.style.transition = 'opacity .4s';
         el.style.opacity = '0';
-        setTimeout(() => { el.style.display = 'none'; el.style.opacity = '1'; el.style.transition = ''; }, 420);
+        avisarConsulta._tOcultar = setTimeout(() => { el.style.display = 'none'; el.style.opacity = '1'; el.style.transition = ''; }, 420);
       }, exito ? 2500 : 8000);
     }
 
     async function consultarRUC(ruc) {
       const res = await consultarDocumento('ruc', ruc);
       if (!res.ok) avisarConsulta(false, `No se pudo consultar el RUC: ${res.error}. Puedes escribir la razón social a mano.`);
+      else if (res.deCache) avisarConsulta(true, `RUC ${ruc}: se usaron los datos guardados de una consulta anterior.`);
       return res;
     }
 
     async function consultarDNI(dni) {
       const res = await consultarDocumento('dni', dni);
       if (!res.ok) avisarConsulta(false, `No se pudo consultar el DNI: ${res.error}. Puedes escribir el nombre a mano.`);
+      else if (res.deCache) avisarConsulta(true, `DNI ${dni}: se usaron los datos guardados de una consulta anterior.`);
       return res;
     }
 
@@ -1936,6 +1986,8 @@ n      }
       // Auto-lookup RUC cuando tiene 11 dígitos
       useEffect(() => {
         if (tipoComp === 'factura' && ruc.trim().length === 11 && /^\d{11}$/.test(ruc.trim())) {
+          const guardado = leerClienteDoc(ruc.trim());
+          if (guardado) setRazonSocial(guardado.nombre);
           setCargandoCliente(true);
           consultarRUC(ruc.trim()).then(res => {
             setCargandoCliente(false);
@@ -1949,6 +2001,8 @@ n      }
       // Auto-lookup DNI cuando tiene 8 dígitos
       useEffect(() => {
         if (tipoComp === 'boleta' && dniCliente.trim().length === 8 && /^\d{8}$/.test(dniCliente.trim())) {
+          const guardado = leerClienteDoc(dniCliente.trim());
+          if (guardado) setNombreCliente(guardado.nombre);
           setCargandoCliente(true);
           consultarDNI(dniCliente.trim()).then(res => {
             setCargandoCliente(false);
@@ -3507,6 +3561,13 @@ n      }
         const doc = clienteDoc.trim();
         const esRuc = tipoComprobante === 'Factura';
         if (!/^\d+$/.test(doc) || doc.length !== (esRuc ? 11 : 8)) return;
+        // Si ya se consultó antes, el nombre aparece de inmediato mientras se refresca.
+        const guardado = leerClienteDoc(doc);
+        if (guardado) {
+          setClienteNombre(guardado.nombre);
+          setNombreAuto(true);
+          if (esRuc && guardado.direccion) setClienteDireccion(guardado.direccion);
+        }
         setCargandoCliente(true);
         (esRuc ? consultarRUC(doc) : consultarDNI(doc)).then(res => {
           setCargandoCliente(false);
@@ -3514,7 +3575,7 @@ n      }
             setClienteNombre(res.nombre || '');
             setNombreAuto(true);
             if (esRuc) setClienteDireccion(res.direccion || '');
-          } else {
+          } else if (!guardado) {
             setNombreAuto(false);
           }
         });

@@ -68,6 +68,8 @@ Diseñado para gestionar ventas de combustible, empleados, máquinas, facturaci�
   - RUC y DNI vía APIsPERU Consultas (`dniruc.apisperu.com`)
   - Respaldo automático en Factiliza si el principal falla
   - Proveedores intercambiables en `PROVEEDOR_DOC` al inicio del script
+  - El nombre se autocompleta escribiendo el DNI/RUC en cualquiera de los dos campos
+  - Los clientes consultados quedan guardados en el navegador (`grifos_kala_clientes_doc`, los 200 más recientes) y se reutilizan en la siguiente venta; si no hay internet se usan esos datos guardados
 
 ### 5. 👥 Gestión de Trabajadores
 - Alta, edición y baja de empleados
