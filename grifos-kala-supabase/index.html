@@ -612,9 +612,11 @@ n      }
       }
       const nombre = d.razonSocial || d.razon_social || d.nombre_o_razon_social || d.nombre;
       if (!nombre) return null;
+      // Algunos RUC (personas naturales) vienen sin calle, pero con ubigeo suelto.
+      const partesDir = [d.direccion, d.departamento, d.provincia, d.distrito].filter(Boolean);
       return {
         nombre,
-        direccion: d.direccion || '',
+        direccion: d.direccion || (partesDir.length > 1 ? partesDir.join(' - ') : ''),
         estado: d.estado || '',
         condicion: d.condicion || '',
       };
@@ -735,6 +737,7 @@ n      }
       const res = await consultarDocumento('ruc', ruc);
       if (!res.ok) avisarConsulta(false, `No se pudo consultar el RUC: ${res.error}. Puedes escribir la razón social a mano.`);
       else if (res.deCache) avisarConsulta(true, `RUC ${ruc}: se usaron los datos guardados de una consulta anterior.`);
+      else if (!res.direccion) avisarConsulta(false, `RUC ${ruc}: la SUNAT no registra dirección fiscal. Escríbela a mano si la necesitas.`);
       return res;
     }
 
@@ -1987,12 +1990,16 @@ n      }
       useEffect(() => {
         if (tipoComp === 'factura' && ruc.trim().length === 11 && /^\d{11}$/.test(ruc.trim())) {
           const guardado = leerClienteDoc(ruc.trim());
-          if (guardado) setRazonSocial(guardado.nombre);
+          if (guardado) {
+            setRazonSocial(guardado.nombre);
+            if (guardado.direccion) setDireccionCliente(guardado.direccion);
+          }
           setCargandoCliente(true);
           consultarRUC(ruc.trim()).then(res => {
             setCargandoCliente(false);
             if (res.ok) {
               setRazonSocial(res.nombre || '');
+              if (res.direccion) setDireccionCliente(res.direccion);
             }
           });
         }
@@ -3555,6 +3562,7 @@ n      }
       const [clientePlaca, setClientePlaca] = useState('');
       const [cargandoCliente, setCargandoCliente] = useState(false);
       const [nombreAuto, setNombreAuto] = useState(false);
+      const [sinDireccionSunat, setSinDireccionSunat] = useState(false);
 
       // Auto-lookup DNI/RUC cuando se completa el documento
       useEffect(() => {
@@ -3568,13 +3576,17 @@ n      }
           setNombreAuto(true);
           if (esRuc && guardado.direccion) setClienteDireccion(guardado.direccion);
         }
+        setSinDireccionSunat(false);
         setCargandoCliente(true);
         (esRuc ? consultarRUC(doc) : consultarDNI(doc)).then(res => {
           setCargandoCliente(false);
           if (res.ok) {
             setClienteNombre(res.nombre || '');
             setNombreAuto(true);
-            if (esRuc) setClienteDireccion(res.direccion || '');
+            if (esRuc) {
+              setClienteDireccion(res.direccion || '');
+              setSinDireccionSunat(!res.direccion);
+            }
           } else if (!guardado) {
             setNombreAuto(false);
           }
@@ -3605,6 +3617,7 @@ n      }
         setClienteDoc('');
         setClienteDireccion('');
         setClientePlaca('');
+        setSinDireccionSunat(false);
       };
 
       // Al cambiar de Boleta a Factura (o al revés) se descarta el documento del otro tipo
@@ -3613,6 +3626,7 @@ n      }
         setTipoComprobante(tipo);
         if (clienteDoc.trim().length !== largo) {
           setClienteDoc('');
+          setSinDireccionSunat(false);
           if (nombreAuto) { setClienteNombre(''); setNombreAuto(false); }
         }
       };
@@ -3975,8 +3989,8 @@ n      }
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 8 }}>
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Nombre / Razón Social</div><input placeholder="Nombre o DNI/RUC del cliente" value={clienteNombre} onChange={e => onNombreClienteChange(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />{nombreAuto && <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.green, marginTop: 3 }}>✅ Auto-detectado</div>}</div>
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>{tipoComprobante === 'Factura' ? 'RUC' : 'DNI'}</div><div style={{ position: 'relative' }}><input placeholder={tipoComprobante === 'Factura' ? 'RUC (11 dígitos)' : 'DNI (8 dígitos)'} value={clienteDoc} maxLength={tipoComprobante === 'Factura' ? 11 : 8} onChange={e => setClienteDoc(e.target.value.replace(/\D/g, '').slice(0, tipoComprobante === 'Factura' ? 11 : 8))} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', paddingRight: cargandoCliente ? 32 : 10, color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} />{cargandoCliente && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.amber, fontSize: 11 }}>⏳</div>}</div></div>
-            {tipoComprobante === 'Factura' && <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Dirección</div><input placeholder="Dirección fiscal" value={clienteDireccion} onChange={e => setClienteDireccion(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} /></div>}
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Placa (opcional)</div><input placeholder="ABC-123" value={clientePlaca} onChange={e => setClientePlaca(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} /></div>
+            {tipoComprobante === 'Factura' && <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Dirección fiscal</div><input placeholder="Dirección fiscal" value={clienteDireccion} onChange={e => { setClienteDireccion(e.target.value); setSinDireccionSunat(false); }} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />{sinDireccionSunat && !clienteDireccion && <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.amber, marginTop: 3 }}>La SUNAT no registra dirección para este RUC; escríbela a mano.</div>}</div>}
           </div>
         </div>
 
