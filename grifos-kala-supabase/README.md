@@ -60,9 +60,10 @@ Diseñado para gestionar ventas de combustible, empleados, máquinas, facturaci�
 - **Tipos de comprobante:**
   - Factura (con RUC) - Serie F001
   - Boleta (sin RUC) - Serie B001
-- **Integración con ApisPeru:**
-  - Emisión de comprobantes electrónicos
-  - Cálculo automático de IGV (18%)
+- **Comprobantes internos (no van a SUNAT):**
+  - La página es para consultas y pruebas: los comprobantes que imprime son de control interno
+  - La emisión electrónica está DESACTIVADA (`EMISION_ELECTRONICA_AUTO = false`): el código está listo, pero no se envía nada a ApisPeru/SUNAT
+  - Cálculo automático de IGV (18%) solo para el desglose del ticket
 - **Consulta de documentos (autocompletado):**
   - RUC y DNI vía APIsPERU Consultas (`dniruc.apisperu.com`)
   - Respaldo automático en Factiliza si el principal falla
@@ -166,6 +167,7 @@ grifos-kala-supabase/
 ## 📝 Notas
 
 - Los tokens de API (ApisPeru, Factiliza) están incluidos en el código para pruebas
+- No se emiten comprobantes electrónicos: la página aún no está lista para enviar facturas o boletas a la SUNAT
 - La consulta DNI/RUC usa un token aparte del de facturación: se pega en `PROVEEDOR_DOC.proveedores.apisperu.token`
 - Los datos de ventas y empleados son de ejemplo
 - El sistema está en fase de pruebas antes de producción
