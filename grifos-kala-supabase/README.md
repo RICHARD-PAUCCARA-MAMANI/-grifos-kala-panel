@@ -24,7 +24,7 @@ Diseñado para gestionar ventas de combustible, empleados, máquinas, facturaci�
 | Build | Babel Standalone |
 | **Base de Datos** | **Supabase (PostgreSQL)** |
 | **Hosting** | **Vercel** |
-| APIs Externas | ApisPeru (facturación), Factiliza (DNI/RUC) |
+| APIs Externas | ApisPeru (facturación + consultas DNI/RUC), Factiliza (respaldo DNI/RUC) |
 
 ---
 
@@ -63,9 +63,10 @@ Diseñado para gestionar ventas de combustible, empleados, máquinas, facturaci�
 - **Integración con ApisPeru:**
   - Emisión de comprobantes electrónicos
   - Cálculo automático de IGV (18%)
-- **Consulta de documentos:**
-  - RUC vía API Factiliza
-  - DNI vía API Factiliza
+- **Consulta de documentos (autocompletado):**
+  - RUC y DNI vía APIsPERU Consultas (`dniruc.apisperu.com`)
+  - Respaldo automático en Factiliza si el principal falla
+  - Proveedores intercambiables en `PROVEEDOR_DOC` al inicio del script
 
 ### 5. 👥 Gestión de Trabajadores
 - Alta, edición y baja de empleados
@@ -165,6 +166,7 @@ grifos-kala-supabase/
 ## 📝 Notas
 
 - Los tokens de API (ApisPeru, Factiliza) están incluidos en el código para pruebas
+- La consulta DNI/RUC usa un token aparte del de facturación: se pega en `PROVEEDOR_DOC.proveedores.apisperu.token`
 - Los datos de ventas y empleados son de ejemplo
 - El sistema está en fase de pruebas antes de producción
 

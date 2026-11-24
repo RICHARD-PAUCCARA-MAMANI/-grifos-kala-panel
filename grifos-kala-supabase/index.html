@@ -27,7 +27,7 @@
   4. FACTURACIÓN ELECTRÓNICA
      - Emisión de Facturas (con RUC) y Boletas (sin RUC)
      - Integración con ApisPeru para comprobantes electrónicos
-     - Consulta de DNI y RUC vía API Factiliza
+     - Consulta de DNI y RUC vía APIsPERU Consultas (respaldo: Factiliza)
      - Cálculo automático de IGV (18%)
 
   5. GESTIÓN DE TRABAJADORES
@@ -572,48 +572,127 @@ n      }
       token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MTk1MyJ9.2CV52mUCNSAIgyVk7m2O8GBUjeFrDPk9Mvkavm9hD7w',
     };
 
-    /* ===================== FACTILIZA - CONSULTA DNI/RUC ===================== */
-    const FACTILIZA = {
-      baseUrl: 'https://api.factiliza.com/v1',
-      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MTk1MyJ9.2CV52mUCNSAIgyVk7m2O8GBUjeFrDPk9Mvkavm9hD7w',
+    /* ===================== CONSULTA DNI/RUC - PROVEEDORES ===================== */
+    // La página corre en el navegador, así que el proveedor TIENE que permitir CORS.
+    // Verificado: APIsPERU Consultas y Factiliza sí lo permiten (apis.net.pe/Decolecta no).
+    //
+    // Para cambiar de proveedor basta mover el nombre en `activo`. El orden de intento
+    // es `activo` primero y el resto después, así que si uno se cae el otro responde.
+    // Un proveedor sin token se salta solo: no hace falta borrarlo.
+    const PROVEEDOR_DOC = {
+      activo: 'apisperu',
+      proveedores: {
+        apisperu: {
+          nombre: 'APIsPERU Consultas',
+          // Token del servicio "Consulta DNI/RUC" (NO el de facturación: ese no sirve aquí).
+          // Se obtiene gratis en apisperu.com/servicios/dniruc (1000 consultas al mes).
+          token: '',
+          url: (tipo, numero, token) => `https://dniruc.apisperu.com/api/v1/${tipo}/${numero}?token=${encodeURIComponent(token)}`,
+          headers: () => ({ 'Accept': 'application/json' }),
+        },
+        factiliza: {
+          nombre: 'Factiliza',
+          token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MTk1MyJ9.2CV52mUCNSAIgyVk7m2O8GBUjeFrDPk9Mvkavm9hD7w',
+          url: (tipo, numero) => `https://api.factiliza.com/v1/${tipo}/info/${numero}`,
+          headers: (token) => ({ 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }),
+        },
+      },
     };
 
-    async function consultarRUC(ruc) {
-      try {
-        const response = await fetch(`${FACTILIZA.baseUrl}/ruc/info/${ruc}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${FACTILIZA.token}`,
-            'Accept': 'application/json'
-          }
-        });
-        const result = await response.json();
-        if (result.success && result.data) {
-          return { ok: true, nombre: result.data.nombre_o_razon_social, direccion: result.data.direccion || '', estado: result.data.estado };
-        }
-        return { ok: false, error: result.message || 'No encontrado' };
-      } catch (err) {
-        return { ok: false, error: err.message };
+    // Cada proveedor devuelve los datos con otros nombres de campo; se normaliza aquí.
+    function normalizarDocumento(json, tipo) {
+      const d = (json && (json.data || json.result)) || json;
+      if (!d || typeof d !== 'object') return null;
+      if (tipo === 'dni') {
+        if (d.nombre_completo) return { nombre: d.nombre_completo };
+        if (d.nombre) return { nombre: d.nombre };
+        const partes = [d.apellidoPaterno || d.apellido_paterno, d.apellidoMaterno || d.apellido_materno, d.nombres];
+        const nombre = partes.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+        return nombre ? { nombre } : null;
       }
+      const nombre = d.razonSocial || d.razon_social || d.nombre_o_razon_social || d.nombre;
+      if (!nombre) return null;
+      return {
+        nombre,
+        direccion: d.direccion || '',
+        estado: d.estado || '',
+        condicion: d.condicion || '',
+      };
+    }
+
+    async function consultarDocumento(tipo, numero) {
+      const limpio = String(numero || '').replace(/\D/g, '');
+      const digitos = tipo === 'dni' ? 8 : 11;
+      if (limpio.length !== digitos) {
+        return { ok: false, error: `El ${tipo.toUpperCase()} debe tener ${digitos} dígitos` };
+      }
+
+      const lista = PROVEEDOR_DOC.proveedores;
+      const orden = [PROVEEDOR_DOC.activo].concat(Object.keys(lista).filter(k => k !== PROVEEDOR_DOC.activo));
+      let ultimoError = 'No hay proveedor de consultas configurado';
+      let seIntento = false;
+
+      for (const clave of orden) {
+        const cfg = lista[clave];
+        if (!cfg) continue;
+        if (!cfg.token) {
+          // Solo se menciona si nadie respondió: el error real del otro proveedor dice más.
+          if (!seIntento) ultimoError = `Falta el token de ${cfg.nombre}`;
+          continue;
+        }
+        seIntento = true;
+        try {
+          const response = await fetch(cfg.url(tipo, limpio, cfg.token), {
+            method: 'GET',
+            headers: cfg.headers(cfg.token),
+          });
+          let json = null;
+          try { json = await response.json(); } catch (e) { /* respuesta sin JSON */ }
+          const datos = normalizarDocumento(json, tipo);
+          if (response.ok && datos) return Object.assign({ ok: true, proveedor: cfg.nombre }, datos);
+          ultimoError = (json && (json.message || json.error)) || `Error HTTP ${response.status}`;
+        } catch (err) {
+          ultimoError = err.message || 'No se pudo conectar';
+        }
+      }
+      return { ok: false, error: ultimoError };
+    }
+
+    // Aviso flotante: una consulta fallida antes quedaba en silencio y el campo se
+    // quedaba vacío sin explicación.
+    function avisarConsulta(exito, mensaje) {
+      let el = document.getElementById('aviso-consulta-doc');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'aviso-consulta-doc';
+        el.style.cssText = 'position:fixed;right:16px;bottom:16px;max-width:330px;z-index:9999;' +
+          'background:#1f2937;color:#f9fafb;border-left:4px solid #f59e0b;border-radius:10px;' +
+          'padding:12px 14px;font:13px/1.45 system-ui,-apple-system,sans-serif;' +
+          'box-shadow:0 12px 30px rgba(0,0,0,.28)';
+        document.body.appendChild(el);
+      }
+      el.style.borderLeftColor = exito ? '#10b981' : '#f59e0b';
+      el.textContent = mensaje;
+      el.style.display = 'block';
+      el.style.opacity = '1';
+      clearTimeout(avisarConsulta._t);
+      avisarConsulta._t = setTimeout(() => {
+        el.style.transition = 'opacity .4s';
+        el.style.opacity = '0';
+        setTimeout(() => { el.style.display = 'none'; el.style.opacity = '1'; el.style.transition = ''; }, 420);
+      }, exito ? 2500 : 8000);
+    }
+
+    async function consultarRUC(ruc) {
+      const res = await consultarDocumento('ruc', ruc);
+      if (!res.ok) avisarConsulta(false, `No se pudo consultar el RUC: ${res.error}. Puedes escribir la razón social a mano.`);
+      return res;
     }
 
     async function consultarDNI(dni) {
-      try {
-        const response = await fetch(`${FACTILIZA.baseUrl}/dni/info/${dni}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${FACTILIZA.token}`,
-            'Accept': 'application/json'
-          }
-        });
-        const result = await response.json();
-        if (result.success && result.data) {
-          return { ok: true, nombre: result.data.nombre_completo };
-        }
-        return { ok: false, error: result.message || 'No encontrado' };
-      } catch (err) {
-        return { ok: false, error: err.message };
-      }
+      const res = await consultarDocumento('dni', dni);
+      if (!res.ok) avisarConsulta(false, `No se pudo consultar el DNI: ${res.error}. Puedes escribir el nombre a mano.`);
+      return res;
     }
 
     // La página solo emite comprobantes internos: no se envía nada a SUNAT.
