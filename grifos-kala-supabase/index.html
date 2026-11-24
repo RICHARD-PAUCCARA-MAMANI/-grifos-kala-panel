@@ -3598,6 +3598,15 @@ n      }
         setNombreAuto(false);
       };
 
+      // Borra de una vez todos los datos del cliente de la venta en curso
+      const limpiarCliente = () => {
+        setClienteNombre('');
+        setNombreAuto(false);
+        setClienteDoc('');
+        setClienteDireccion('');
+        setClientePlaca('');
+      };
+
       // Al cambiar de Boleta a Factura (o al revés) se descarta el documento del otro tipo
       const onTipoComprobanteChange = (tipo) => {
         const largo = tipo === 'Factura' ? 11 : 8;
@@ -3957,7 +3966,12 @@ n      }
             ))}
           </div>
           {/* Datos del cliente */}
-          <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Datos del cliente</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+            <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Datos del cliente</div>
+            {(clienteNombre || clienteDoc || clienteDireccion || clientePlaca) && (
+              <button type="button" onClick={limpiarCliente} title="Borrar nombre, documento, dirección y placa" style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, fontFamily: 'Inter', fontSize: 10.5, fontWeight: 600, cursor: 'pointer' }}>Limpiar cliente</button>
+            )}
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 8 }}>
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Nombre / Razón Social</div><input placeholder="Nombre o DNI/RUC del cliente" value={clienteNombre} onChange={e => onNombreClienteChange(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />{nombreAuto && <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.green, marginTop: 3 }}>✅ Auto-detectado</div>}</div>
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>{tipoComprobante === 'Factura' ? 'RUC' : 'DNI'}</div><div style={{ position: 'relative' }}><input placeholder={tipoComprobante === 'Factura' ? 'RUC (11 dígitos)' : 'DNI (8 dígitos)'} value={clienteDoc} maxLength={tipoComprobante === 'Factura' ? 11 : 8} onChange={e => setClienteDoc(e.target.value.replace(/\D/g, '').slice(0, tipoComprobante === 'Factura' ? 11 : 8))} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', paddingRight: cargandoCliente ? 32 : 10, color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} />{cargandoCliente && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.amber, fontSize: 11 }}>⏳</div>}</div></div>
