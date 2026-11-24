@@ -3500,27 +3500,52 @@ n      }
       const [clienteDireccion, setClienteDireccion] = useState('');
       const [clientePlaca, setClientePlaca] = useState('');
       const [cargandoCliente, setCargandoCliente] = useState(false);
+      const [nombreAuto, setNombreAuto] = useState(false);
 
-      // Auto-lookup DNI/RUC cuando cambia el documento
+      // Auto-lookup DNI/RUC cuando se completa el documento
       useEffect(() => {
         const doc = clienteDoc.trim();
-        if (tipoComprobante === 'Factura' && doc.length === 11 && /^\d{11}$/.test(doc)) {
-          setCargandoCliente(true);
-          consultarRUC(doc).then(res => {
-            setCargandoCliente(false);
-            if (res.ok) {
-              setClienteNombre(res.nombre || '');
-              setClienteDireccion(res.direccion || '');
-            }
-          });
-        } else if ((tipoComprobante === 'Boleta' || tipoComprobante === 'Cotización') && doc.length === 8 && /^\d{8}$/.test(doc)) {
-          setCargandoCliente(true);
-          consultarDNI(doc).then(res => {
-            setCargandoCliente(false);
-            if (res.ok) setClienteNombre(res.nombre || '');
-          });
-        }
+        const esRuc = tipoComprobante === 'Factura';
+        if (!/^\d+$/.test(doc) || doc.length !== (esRuc ? 11 : 8)) return;
+        setCargandoCliente(true);
+        (esRuc ? consultarRUC(doc) : consultarDNI(doc)).then(res => {
+          setCargandoCliente(false);
+          if (res.ok) {
+            setClienteNombre(res.nombre || '');
+            setNombreAuto(true);
+            if (esRuc) setClienteDireccion(res.direccion || '');
+          } else {
+            setNombreAuto(false);
+          }
+        });
       }, [clienteDoc, tipoComprobante]);
+
+      // Si escriben o pegan el documento en el campo del nombre, se toma como documento
+      const onNombreClienteChange = (valor) => {
+        const limpio = valor.trim();
+        if (/^\d{8}$/.test(limpio) || /^\d{11}$/.test(limpio)) {
+          const esRuc = limpio.length === 11;
+          if (tipoComprobante === 'Boleta' || tipoComprobante === 'Factura') {
+            setTipoComprobante(esRuc ? 'Factura' : 'Boleta');
+          }
+          setClienteDoc(limpio);
+          setClienteNombre('');
+          setNombreAuto(false);
+          return;
+        }
+        setClienteNombre(valor);
+        setNombreAuto(false);
+      };
+
+      // Al cambiar de Boleta a Factura (o al revés) se descarta el documento del otro tipo
+      const onTipoComprobanteChange = (tipo) => {
+        const largo = tipo === 'Factura' ? 11 : 8;
+        setTipoComprobante(tipo);
+        if (clienteDoc.trim().length !== largo) {
+          setClienteDoc('');
+          if (nombreAuto) { setClienteNombre(''); setNombreAuto(false); }
+        }
+      };
 
       const METODOS_PAGO = [
         { id: 'efectivo', label: 'Efectivo', icon: WI.Banknote, color: C.green },
@@ -3867,14 +3892,14 @@ n      }
           <div style={{ fontFamily: 'Inter', fontSize: 12, color: C.muted, marginBottom: 10, fontWeight: 600 }}>4. Comprobante</div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             {[{ label: 'Boleta' }, { label: 'Factura' }, { label: 'Nota de venta' }, { label: 'Cotización' }].map(c => (
-              <button key={c.label} onClick={() => setTipoComprobante(c.label)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1.5px solid ${tipoComprobante === c.label ? C.amber : C.border}`, background: tipoComprobante === c.label ? C.amberSoft : 'transparent', color: tipoComprobante === c.label ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{c.label}</button>
+              <button key={c.label} onClick={() => onTipoComprobanteChange(c.label)} type="button" style={{ padding: '8px 16px', borderRadius: 8, border: `1.5px solid ${tipoComprobante === c.label ? C.amber : C.border}`, background: tipoComprobante === c.label ? C.amberSoft : 'transparent', color: tipoComprobante === c.label ? C.amber : C.textDim, fontFamily: 'Inter', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{c.label}</button>
             ))}
           </div>
           {/* Datos del cliente */}
           <div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Datos del cliente</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 8 }}>
-            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Nombre / Razón Social</div><input placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />{clienteNombre && <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.green, marginTop: 3 }}>✅ Auto-detectado</div>}</div>
-            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>{tipoComprobante === 'Factura' ? 'RUC' : 'DNI'}</div><div style={{ position: 'relative' }}><input placeholder={tipoComprobante === 'Factura' ? 'RUC (11 dígitos)' : 'DNI (8 dígitos)'} value={clienteDoc} onChange={e => setClienteDoc(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', paddingRight: cargandoCliente ? 32 : 10, color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} />{cargandoCliente && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.amber, fontSize: 11 }}>⏳</div>}</div></div>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Nombre / Razón Social</div><input placeholder="Nombre o DNI/RUC del cliente" value={clienteNombre} onChange={e => onNombreClienteChange(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} />{nombreAuto && <div style={{ fontFamily: 'Inter', fontSize: 10, color: C.green, marginTop: 3 }}>✅ Auto-detectado</div>}</div>
+            <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>{tipoComprobante === 'Factura' ? 'RUC' : 'DNI'}</div><div style={{ position: 'relative' }}><input placeholder={tipoComprobante === 'Factura' ? 'RUC (11 dígitos)' : 'DNI (8 dígitos)'} value={clienteDoc} maxLength={tipoComprobante === 'Factura' ? 11 : 8} onChange={e => setClienteDoc(e.target.value.replace(/\D/g, '').slice(0, tipoComprobante === 'Factura' ? 11 : 8))} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', paddingRight: cargandoCliente ? 32 : 10, color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} />{cargandoCliente && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.amber, fontSize: 11 }}>⏳</div>}</div></div>
             {tipoComprobante === 'Factura' && <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Dirección</div><input placeholder="Dirección fiscal" value={clienteDireccion} onChange={e => setClienteDireccion(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'Inter', fontSize: 12, boxSizing: 'border-box' }} /></div>}
             <div><div style={{ fontFamily: 'Inter', fontSize: 11, color: C.muted, marginBottom: 3 }}>Placa (opcional)</div><input placeholder="ABC-123" value={clientePlaca} onChange={e => setClientePlaca(e.target.value)} style={{ width: '100%', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 10px', color: C.text, fontFamily: 'JetBrains Mono', fontSize: 12, boxSizing: 'border-box' }} /></div>
           </div>
